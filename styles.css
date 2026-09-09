@@ -145,6 +145,23 @@ button.primary:hover { filter: brightness(1.08); }
 }
 .followpill:hover { border-color: var(--accent); }
 
+/* Pops up over a sprig you have just pointed at, so switching to it never means
+   trying to tap a moving target twice. */
+.picktag {
+  position: absolute; z-index: 4; transform: translate(-50%, -100%);
+  background: var(--accent); color: #16241d; border: 0;
+  border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0,0,0,.4); white-space: nowrap;
+}
+.picktag::after {
+  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  background: var(--accent); transform: translateX(-50%) rotate(45deg); border-radius: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .picktag { animation: pop .18s ease-out; }
+}
+@keyframes pop { from { transform: translate(-50%, -100%) scale(.8); opacity: 0; } }
+
 /* ---------- hud ---------- */
 #hud {
   display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) minmax(0,auto);
@@ -174,12 +191,18 @@ button.primary:hover { filter: brightness(1.08); }
 .bar { height: 7px; border-radius: 999px; background: #171a25; overflow: hidden; }
 .bar em { display: block; height: 100%; border-radius: 999px; transition: width .25s ease; }
 
-.roster { display: flex; align-items: center; gap: 6px; min-width: 0; }
-#rosterList { display: flex; gap: 4px; max-width: 210px; overflow-x: auto; min-width: 0; }
+.roster { display: flex; align-items: center; gap: 7px; min-width: 0; }
+#rosterList { display: flex; gap: 5px; max-width: 240px; overflow-x: auto; min-width: 0;
+  padding: 2px 0; scrollbar-width: thin; }
+.rosterlabel {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--dim); flex: none;
+}
 .chip {
-  display: flex; align-items: center; gap: 5px; flex: none;
+  display: flex; align-items: center; gap: 6px; flex: none;
   background: var(--panel2); border: 1px solid var(--line);
-  border-radius: 999px; padding: 3px 9px 3px 5px; font-size: 12px; font-weight: 700;
+  border-radius: 999px; padding: 7px 13px 7px 8px; font-size: 12.5px; font-weight: 700;
+  min-height: 34px;   /* a finger-sized target, not a 25px sliver */
 }
 .chip.on { border-color: var(--accent); }
 .chip.dead { opacity: .45; }
@@ -243,7 +266,12 @@ button.primary:hover { filter: brightness(1.08); }
 @media (max-width: 720px) {
   #hud { grid-template-columns: 1fr; gap: 8px; }
   .roster { justify-content: space-between; }
-  #rosterList { max-width: none; flex: 1; }
+  /* On a phone the row is only wide enough for the names and the egg button,
+     so the label goes and the list takes whatever is left. */
+  .rosterlabel { display: none; }
+  .wide-only { display: none; }
+  #rosterList { max-width: none; flex: 1 1 auto; min-width: 0; }
+  #btnEgg { flex: none; }
   .needs { grid-template-columns: 1fr 1fr; }
   .tools button { min-width: 0; padding: 6px 8px; }
   .tools button b { display: none; }

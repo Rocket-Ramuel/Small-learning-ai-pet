@@ -41,6 +41,7 @@
     </div>
 
     <button id="btnFollow" class="followpill" hidden>⤺ Follow</button>
+    <button id="pickTag" class="picktag" hidden></button>
     <div id="toast" class="toast" hidden></div>
     <div id="journal" class="journal" aria-live="polite"></div>
   </main>
@@ -65,8 +66,9 @@
     </div>
     <div id="needs" class="needs"></div>
     <div class="roster">
+      <span class="rosterlabel">Looking after</span>
       <div id="rosterList"></div>
-      <button id="btnEgg" class="primary" title="Add a new sprig from a fresh genome">＋ New egg</button>
+      <button id="btnEgg" class="primary" title="Add a new sprig from a fresh genome">＋ <span class="wide-only">New </span>egg</button>
     </div>
   </footer>
 
@@ -95,8 +97,10 @@
             <b>say</b> a word. Pointing never speaks for you, so you are free to
             teach a sprig that “water” means the berry bush — and it will
             believe you.</li>
-        <li><b>Drag</b> the ground to look around the valley. Tap a sprig twice,
-            or tap its name below, to switch to looking after it.</li>
+        <li><b>Drag</b> the ground to look around the valley.</li>
+        <li>To <b>switch sprig</b>, tap its name along the bottom — or tap the
+            sprig itself and press the <b>Look after</b> tag that pops up above
+            it.</li>
         <li><b>Tickle</b> to praise. Whatever it was just doing, it will do more
             of. <b>Scold</b> to discourage. Both work through real chemistry, so
             they take a few seconds to sink in.</li>

@@ -30,8 +30,12 @@ Four things your hand can do, and a row of words you can say.
 | **Scold** | Discourage. Both work through real chemistry, so they take a few seconds to land. |
 
 Drag the ground to look around; a **Follow** button brings you back to your sprig.
-Tap a sprig once to point at it — which is how another sprig learns the word
-*friend* — and twice, or tap its name, to switch to looking after it.
+
+Tapping a sprig points at it — which is how another sprig learns the word
+*friend* — and never switches away from the one you are raising. To switch,
+either tap a name in the **Looking after** row along the bottom, or press the
+**Look after** tag that appears over any sprig you point at. The tag follows the
+animal as it walks, so switching never means hitting a moving target.
 
 Pointing and naming are deliberately two separate acts. If pointing spoke for
 you, every sprig would only ever learn the words we chose. Instead you can point

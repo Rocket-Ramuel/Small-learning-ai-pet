@@ -120,7 +120,6 @@
     var self = this, cv = el('view');
     var dragging = null;    /* an object being carried */
     var panning = null;     /* {px, cam} while the valley is being dragged */
-    var lastTap = { t: 0, target: null };
 
     function worldPos(ev) {
       var r = cv.getBoundingClientRect();
@@ -165,17 +164,6 @@
       hand.active = true;
       hand.x = p.x;
       hand.y = CG.clamp(p.y, 60, self.game.world.groundY);
-
-      /* Two taps on the same sprig switches to it. One tap only points, so you
-       * can show a sprig its friend without changing who you are looking after. */
-      var now = performance.now();
-      if (hit instanceof CG.Creature && lastTap.target === hit && now - lastTap.t < 420) {
-        lastTap.target = null;
-        self.select(hit);
-        self.toast('Now looking after ' + hit.name + '.');
-        return;
-      }
-      lastTap = { t: now, target: hit };
 
       if (self.tool === 'carry' && hit) {
         if (hit instanceof CG.Creature) hit.held = true;
@@ -241,6 +229,14 @@
       ev.preventDefault();
     }, { passive: false });
 
+    el('pickTag').addEventListener('click', function () {
+      var c = self.pickTarget;
+      if (!c) return;
+      self.select(c);
+      self.hidePick();
+      self.toast('Now looking after ' + c.name + '.');
+    });
+
     el('btnFollow').addEventListener('click', function () {
       self.freeLook(false);
       if (self.selected) self.toast('Following ' + self.selected.name + ' again.');
@@ -289,6 +285,39 @@
     this.suggestWord(CG.CAT_LABEL[obj.cat]);
     this.toast(c.name + ' is looking at ' + (obj instanceof CG.Creature ? label : 'the ' + label) +
       ' — now say a word.');
+
+    /* Pointing at another sprig teaches "friend"; it should also be how you
+     * switch to that sprig, without asking anyone to tap a walking animal twice.
+     * The tag follows it, so it stays hittable however fast the world is running. */
+    if (obj instanceof CG.Creature) this.offerPick(obj);
+  };
+
+  UI.prototype.offerPick = function (c) {
+    this.pickTarget = c;
+    this.pickT = 7;
+    var b = el('pickTag');
+    b.textContent = 'Look after ' + c.name;
+    b.hidden = false;
+    this.positionPickTag();
+  };
+
+  UI.prototype.hidePick = function () {
+    this.pickTarget = null;
+    el('pickTag').hidden = true;
+  };
+
+  UI.prototype.positionPickTag = function () {
+    var c = this.pickTarget, b = el('pickTag');
+    if (!c) return;
+    var r = this.game.renderer;
+    var x = r.toScreen(c.x) * r.zoom;
+    var y = (r.groundScreenY() - 52 - 34 * c.size) * r.zoom;
+    /* A sprig can walk out of the view in a second at 8x. Pin the tag to the
+     * edge rather than taking it away - you asked to switch to that animal, and
+     * it should not matter that it wandered off while you reached for it. */
+    var edge = Math.min(90, r.w / 2 - 10);
+    b.style.left = Math.round(CG.clamp(x, edge, Math.max(edge, r.w - edge))) + 'px';
+    b.style.top = Math.max(8, Math.round(y)) + 'px';
   };
 
   /* A gentle nudge toward the usual name, without ever insisting on it. */
@@ -344,6 +373,7 @@
 
   UI.prototype.select = function (c) {
     this.selected = c;
+    if (this.pickTarget === c) this.hidePick();
     this.freeLook(false);
     this.refreshRoster();
     this.refreshWordMarks();
@@ -380,6 +410,12 @@
       this.toastT -= dt;
       if (this.toastT <= 0) el('toast').hidden = true;
     }
+    if (this.pickTarget) {
+      this.pickT -= dt;
+      if (this.pickT <= 0 || !this.pickTarget.alive || this.pickTarget === this.selected) this.hidePick();
+      else this.positionPickTag();
+    }
+
     var dirty = false;
     for (i = this.journal.length - 1; i >= 0; i--) {
       this.journal[i].t -= dt;
@@ -453,7 +489,13 @@
     if (sig === this._rosterSig) return;
     this._rosterSig = sig;
     list.innerHTML = '';
-    w.creatures.slice(-8).forEach(function (c) {
+    /* The living come first: a valley full of ancestors must never push the
+     * sprig you are actually raising out of the list. */
+    var living = w.creatures.filter(function (c) { return c.alive; });
+    var gone = w.creatures.filter(function (c) { return !c.alive; });
+    var shown = living.concat(gone).slice(0, 9);
+    if (this.selected && shown.indexOf(this.selected) < 0) shown.unshift(this.selected);
+    shown.forEach(function (c) {
       var b = document.createElement('button');
       b.className = 'chip' + (c === self.selected ? ' on' : '') + (c.alive ? '' : ' dead');
       var dot = document.createElement('span');
@@ -462,7 +504,12 @@
         (c.C.traits.light * 100) + '%)';
       b.appendChild(dot);
       b.appendChild(document.createTextNode(c.name));
-      b.addEventListener('click', function () { self.select(c); });
+      b.title = 'Look after ' + c.name;
+      b.addEventListener('click', function () {
+        self.select(c);
+        self.hidePick();
+        self.toast('Now looking after ' + c.name + '.');
+      });
       list.appendChild(b);
     });
   };
