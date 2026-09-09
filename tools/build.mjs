@@ -30,10 +30,15 @@ const body = html
 
 const title = (html.match(/<title>([^<]*)<\/title>/) || [, 'Sprigs'])[1];
 
+/* Google Fonts is the one external stylesheet host artifact hosting admits, so
+ * the <link> tags travel with the bundle rather than being inlined. */
+const fontLinks = [...html.matchAll(/<link[^>]*fonts\.(?:googleapis|gstatic)\.com[^>]*>/g)]
+  .map((m) => m[0]).join('\n');
+
 /* Closing tags inside string literals would end the script element early. */
 const safeJs = js.replace(/<\/script>/gi, '<\\/script>');
 
-const head = `<title>${title}</title>\n<style>\n${css}\n</style>`;
+const head = `<title>${title}</title>\n${fontLinks}\n<style>\n${css}\n</style>`;
 const tail = `<script>\n${safeJs}\n</script>`;
 
 mkdirSync(resolve(root, 'dist'), { recursive: true });
