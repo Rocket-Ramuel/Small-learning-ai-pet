@@ -117,7 +117,10 @@
 
   /* ---------- pointer ---------- */
   UI.prototype.bindCanvas = function () {
-    var self = this, cv = el('view'), dragging = null;
+    var self = this, cv = el('view');
+    var dragging = null;    /* an object being carried */
+    var panning = null;     /* {px, cam} while the valley is being dragged */
+    var lastTap = { t: 0, target: null };
 
     function worldPos(ev) {
       var r = cv.getBoundingClientRect();
@@ -129,18 +132,28 @@
       };
     }
 
+    /* Hit testing has to care about height as well as position, or a tap on the
+     * open sky lands on whatever bush happens to be below it - which also robs
+     * the player of the empty space they need in order to drag the view. */
     function pick(p) {
-      var g = self.game, best = null, bestD = 46;
+      var g = self.game, ground = g.world.groundY;
+      var best = null, bestD = Infinity;
+
+      function consider(o, halfW, top) {
+        var dx = Math.abs(o.x - p.x);
+        if (dx > halfW) return;
+        /* objects stand on the ground and rise to `top` above it */
+        if (p.y > ground + 26 || p.y < ground - top) return;
+        if (dx < bestD) { bestD = dx; best = o; }
+      }
+
       g.world.creatures.forEach(function (c) {
-        var d = Math.abs(c.x - p.x);
-        if (c.alive && d < bestD + 18) { bestD = d; best = c; }
+        if (c.alive) consider(c, 34 + 26 * c.size, 40 + 70 * c.size);
       });
       if (best) return best;
       g.world.objects.forEach(function (o) {
         if (o.eaten) return;
-        var d = Math.abs(o.x - p.x);
-        var lim = Math.max(26, o.r);
-        if (d < lim && (!best || d < bestD)) { bestD = d; best = o; }
+        consider(o, Math.max(26, o.r), o.kind === 'lamp' ? 96 : Math.max(34, o.r * 1.3));
       });
       return best;
     }
@@ -148,36 +161,59 @@
     cv.addEventListener('pointerdown', function (ev) {
       cv.setPointerCapture(ev.pointerId);
       var p = worldPos(ev), hit = pick(p);
-      self.game.world.hand.active = true;
-      self.game.world.hand.x = p.x;
-      self.game.world.hand.y = CG.clamp(p.y, 60, self.game.world.groundY);
+      var hand = self.game.world.hand;
+      hand.active = true;
+      hand.x = p.x;
+      hand.y = CG.clamp(p.y, 60, self.game.world.groundY);
 
-      if (self.tool === 'carry') {
-        if (hit && (hit.movable !== false)) {
-          if (hit instanceof CG.Creature) { hit.held = true; }
-          else if (CG.KINDS[hit.kind] && (CG.KINDS[hit.kind].movable || hit.kind === 'berry' || hit.kind === 'egg')) {
-            hit.held = true;
-          } else { self.toast('The ' + self.labelOf(hit) + ' is rooted to the spot.'); hit = null; }
-          if (hit) { dragging = hit; self.game.world.hand.holding = hit; }
-        }
+      /* Two taps on the same sprig switches to it. One tap only points, so you
+       * can show a sprig its friend without changing who you are looking after. */
+      var now = performance.now();
+      if (hit instanceof CG.Creature && lastTap.target === hit && now - lastTap.t < 420) {
+        lastTap.target = null;
+        self.select(hit);
+        self.toast('Now looking after ' + hit.name + '.');
         return;
       }
-      if (!hit) return;
+      lastTap = { t: now, target: hit };
+
+      if (self.tool === 'carry' && hit) {
+        if (hit instanceof CG.Creature) hit.held = true;
+        else if (CG.KINDS[hit.kind] && (CG.KINDS[hit.kind].movable || hit.kind === 'berry' || hit.kind === 'egg')) {
+          hit.held = true;
+        } else { self.toast('The ' + self.labelOf(hit) + ' is rooted to the spot.'); hit = null; }
+        if (hit) { dragging = hit; hand.holding = hit; return; }
+      }
+
+      if (!hit) {
+        /* Empty ground: drag to look around. This is the only way to move the
+         * view on a touch screen, where there is no scroll wheel. */
+        panning = { px: ev.clientX, cam: self.game.renderer.camX, moved: 0 };
+        return;
+      }
 
       if (hit instanceof CG.Creature) {
         if (self.tool === 'tickle') { hit.tickle(); self.toast('You tickled ' + hit.name + '.'); }
         else if (self.tool === 'scold') { hit.scold(); self.toast('You scolded ' + hit.name + '.'); }
-        else { self.select(hit); }
+        else if (self.tool === 'point') { self.pointAt(hit); }
       } else if (self.tool === 'point') {
         self.pointAt(hit);
       }
     });
 
     cv.addEventListener('pointermove', function (ev) {
-      var p = worldPos(ev), h = self.game.world.hand;
+      var g = self.game;
+      if (panning) {
+        var dx = ev.clientX - panning.px;
+        panning.moved = Math.max(panning.moved, Math.abs(dx));
+        if (panning.moved > 6) self.freeLook(true);
+        g.renderer.camX = self.clampCam(panning.cam - dx / g.renderer.zoom);
+        return;
+      }
+      var p = worldPos(ev), h = g.world.hand;
       h.active = true;
-      h.x = CG.clamp(p.x, 0, self.game.world.w);
-      h.y = CG.clamp(p.y, 60, self.game.world.groundY);
+      h.x = CG.clamp(p.x, 0, g.world.w);
+      h.y = CG.clamp(p.y, 60, g.world.groundY);
       if (dragging) {
         dragging.x = h.x;
         if (dragging.vx != null) dragging.vx = 0;
@@ -190,22 +226,39 @@
         self.game.world.hand.holding = null;
         dragging = null;
       }
+      panning = null;
     }
     cv.addEventListener('pointerleave', function () {
-      if (!dragging) self.game.world.hand.active = false;
+      if (!dragging && !panning) self.game.world.hand.active = false;
     });
     cv.addEventListener('pointerup', release);
     cv.addEventListener('pointercancel', release);
+
     cv.addEventListener('wheel', function (ev) {
-      /* let the player look around without losing their sprig */
-      self.game.renderer.camX = CG.clamp(
-        self.game.renderer.camX + (Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY),
-        0, self.game.world.w);
-      self.game.followSelected = false;
-      clearTimeout(self._panT);
-      self._panT = setTimeout(function () { self.game.followSelected = true; }, 2600);
+      self.freeLook(true);
+      self.game.renderer.camX = self.clampCam(self.game.renderer.camX +
+        (Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY));
       ev.preventDefault();
     }, { passive: false });
+
+    el('btnFollow').addEventListener('click', function () {
+      self.freeLook(false);
+      if (self.selected) self.toast('Following ' + self.selected.name + ' again.');
+    });
+  };
+
+  UI.prototype.clampCam = function (x) {
+    var r = this.game.renderer, half = r.vw / 2;
+    return CG.clamp(x, half, Math.max(half, this.game.world.w - half));
+  };
+
+  /* Free look: the camera stops chasing the selected sprig until the player
+   * asks it to resume. A button says so, so nobody loses their sprig. */
+  UI.prototype.freeLook = function (on) {
+    this.game.followSelected = !on;
+    var b = el('btnFollow');
+    b.hidden = !on || !this.selected;
+    if (on && this.selected) b.textContent = '⤺ Follow ' + this.selected.name;
   };
 
   UI.prototype.labelOf = function (o) {
@@ -213,22 +266,51 @@
     return (CG.KINDS[o.kind] && CG.KINDS[o.kind].label) || o.kind;
   };
 
-  /* Pointing is the main teaching move: it aims a sprig's attention at a thing
-   * and names it in the same gesture. */
+  /* Pointing aims a sprig's attention and nothing more. It deliberately does
+   * NOT say the thing's name: if pointing spoke for you, you could only ever
+   * teach a sprig the words we chose, and never teach it that "water" means
+   * the berry bush. Point, then say whatever you like. */
   UI.prototype.pointAt = function (obj) {
     var c = this.selected;
-    var word = CG.CAT_LABEL[obj.cat];
     if (!c || !c.alive) { this.toast('No sprig is listening.'); return; }
+    if (obj === c) {
+      this.toast('That is ' + c.name + '. Point at another sprig to teach “friend”.');
+      return;
+    }
     c.focus = obj;
     c.focusDist = Math.abs(obj.x - c.x);
     c.soup.add('curiosity', 0.25);
+    /* Hold that thing at the front of its mind for a few seconds, so whatever
+     * you say next attaches to this and not to everything else in view. */
+    c.pointedAt = { ci: CG.CATS.indexOf(obj.cat), t: 5 };
     this.game.world.spawnEvent('spark', obj.x, this.game.world.groundY - 40);
-    if (word) {
-      this.sayTo(c, word, 0.95);
-      this.toast('“' + word + '” — ' + c.name + ' is looking at the ' + this.labelOf(obj) + '.');
-    } else {
-      this.toast(c.name + ' looks at the ' + this.labelOf(obj) + '.');
+
+    var label = this.labelOf(obj);
+    this.suggestWord(CG.CAT_LABEL[obj.cat]);
+    this.toast(c.name + ' is looking at ' + (obj instanceof CG.Creature ? label : 'the ' + label) +
+      ' — now say a word.');
+  };
+
+  /* A gentle nudge toward the usual name, without ever insisting on it. */
+  UI.prototype.suggestWord = function (word) {
+    clearTimeout(this._suggestT);
+    Array.prototype.forEach.call(document.querySelectorAll('#words button'), function (b) {
+      b.classList.toggle('suggested', b.dataset.word === word);
+    });
+    if (!word) return;
+    /* Scroll the word strip only. scrollIntoView would walk up to the document
+     * and shunt the whole page sideways - an overflow:hidden root still scrolls
+     * when script asks it to. */
+    var chip = document.querySelector('#words button[data-word="' + word + '"]');
+    var strip = el('words');
+    if (chip && strip) {
+      strip.scrollLeft = chip.offsetLeft - strip.clientWidth / 2 + chip.offsetWidth / 2;
     }
+    this._suggestT = setTimeout(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#words button'), function (b) {
+        b.classList.remove('suggested');
+      });
+    }, 6000);
   };
 
   /* Saying a word aloud. Whoever is close enough hears it in whatever situation
@@ -244,7 +326,15 @@
       }
     });
     this.game.world.spawnEvent('call', hand.x, hand.y);
-    this.toast(heard ? 'You said “' + word + '”.' : 'Nobody was near enough to hear.');
+    this.suggestWord(null);
+    var c = this.selected;
+    if (!heard) { this.toast('Nobody was near enough to hear.'); return; }
+    if (c && c.pointedAt && c.pointedAt.t > 0) {
+      this.toast('“' + word + '” — while ' + c.name + ' looks at the ' +
+        (CG.CAT_LABEL[CG.CATS[c.pointedAt.ci]] || 'thing') + '.');
+    } else {
+      this.toast('You said “' + word + '”.');
+    }
   };
 
   UI.prototype.sayTo = function (c, word, attention) {
@@ -254,7 +344,7 @@
 
   UI.prototype.select = function (c) {
     this.selected = c;
-    this.game.followSelected = true;
+    this.freeLook(false);
     this.refreshRoster();
     this.refreshWordMarks();
   };

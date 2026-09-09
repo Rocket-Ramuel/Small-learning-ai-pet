@@ -73,6 +73,7 @@
     this.gravid = 0; this.pendingGenome = null; this.mateCooldown = 20;
     this.rewardBase = 0; this.lastReward = 0;
     this.speech = null; this.speechT = 0;
+    this.pointedAt = null;
     this.bob = rng.range(0, 6.28);
     this.held = false;
     this.nearby = [];
@@ -566,11 +567,25 @@
   Creature.prototype.hear = function (word, attention) {
     if (!this.alive || this.asleep) return;
     var known = this.brain.words[word];
-    this.brain.hearWord(word, this.cats, this.action, this.driveNews, attention == null ? 0.6 : attention);
+    this.brain.hearWord(word, this.attendedCats(), this.action, this.driveNews,
+      attention == null ? 0.6 : attention);
     if (!known) this.stats.words++;
     /* Being spoken to is mildly nice; it is also how a sprig learns that words
      * are worth attending to at all. */
     this.soup.add('curiosity', 0.08);
+  };
+
+  /* What the creature counts as "in view" for the purpose of learning a word.
+   * Normally that is everything it can see, which is why words picked up in
+   * passing are vague. But when something has just been pointed out, that thing
+   * crowds out the rest for a few seconds - so a deliberate lesson lands on the
+   * thing you meant, even if it is the wrong name for it. */
+  Creature.prototype.attendedCats = function () {
+    if (!this.pointedAt || this.pointedAt.t <= 0 || this.pointedAt.ci < 0) return this.cats;
+    var sharp = this._sharp || (this._sharp = new Float32Array(nC));
+    for (var i = 0; i < nC; i++) sharp[i] = this.cats[i] * 0.2;
+    sharp[this.pointedAt.ci] = 1;
+    return sharp;
   };
 
   Creature.prototype.tryMate = function (other) {
@@ -622,6 +637,10 @@
     this.bob += dt * (2.4 + Math.abs(this.vx) * 0.05);
     if (this.speechT > 0) { this.speechT -= dt; if (this.speechT <= 0) this.speech = null; }
     if (this.mateCooldown > 0) this.mateCooldown -= dt;
+    if (this.pointedAt) {
+      this.pointedAt.t -= dt;
+      if (this.pointedAt.t <= 0) this.pointedAt = null;
+    }
 
     /* life stage */
     var frac = this.age / this.lifespan, si = 0;

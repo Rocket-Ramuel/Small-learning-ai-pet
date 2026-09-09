@@ -127,6 +127,23 @@ button.primary:hover { filter: brightness(1.08); }
   transform: scaleX(var(--know, 0)); transform-origin: left;
 }
 .words .grp { width: 1px; background: var(--line); margin: 2px 3px; flex: none; }
+/* The usual name for whatever was just pointed at - an offer, not an instruction. */
+.words button.suggested {
+  border-color: var(--accent2); color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(255,207,122,.16);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .words button.suggested { animation: nudge 1.6s ease-in-out infinite; }
+}
+@keyframes nudge { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+.followpill {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+  background: rgba(28,31,44,.88); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700;
+  backdrop-filter: blur(6px); z-index: 3;
+}
+.followpill:hover { border-color: var(--accent); }
 
 /* ---------- hud ---------- */
 #hud {

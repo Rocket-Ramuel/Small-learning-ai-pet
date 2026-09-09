@@ -23,10 +23,20 @@ Four things your hand can do, and a row of words you can say.
 
 | | |
 |---|---|
-| **Point** | Draws a sprig's attention to something *and* names it. This is the main way to teach. |
+| **Point** | Aims a sprig's attention at something. It does *not* speak for you. |
+| **Say** | Tap a word. Whatever the sprig is looking at is what the word gets attached to. |
 | **Carry** | Pick things up, sprigs included. Move a cold one to the lamp, or two grown ones together. |
 | **Tickle** | Praise. Whatever it was just doing, it will do more of. |
 | **Scold** | Discourage. Both work through real chemistry, so they take a few seconds to land. |
+
+Drag the ground to look around; a **Follow** button brings you back to your sprig.
+Tap a sprig once to point at it — which is how another sprig learns the word
+*friend* — and twice, or tap its name, to switch to looking after it.
+
+Pointing and naming are deliberately two separate acts. If pointing spoke for
+you, every sprig would only ever learn the words we chose. Instead you can point
+at a berry bush, say **water**, and the sprig will believe you — it will think
+"water" means the bush, and say it back to you when it is hungry.
 
 Berries and fruiting bushes are food, pools are water, the lamp is warm, the
 grotto in the west is cold. The white-flowered herb cures illness. The purple

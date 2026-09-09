@@ -31,6 +31,11 @@
     this.renderer.follow(first || { x: 700 }, 0, true);
 
     window.addEventListener('resize', function () { self.renderer.resize(); });
+    /* The layout never scrolls; if some stray focus or scroll call shifts it,
+     * snap it back rather than leaving the chrome clipped off screen. */
+    window.addEventListener('scroll', function () {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    }, { passive: true });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) self.ui.save();
       self.lastT = 0;   /* do not fast forward through the time we were away */
