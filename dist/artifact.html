@@ -1,0 +1,3576 @@
+<title>Sprigs — a tiny world of learning creatures</title>
+<style>
+/* Sprigs - a warm, storybook shell around a cold little simulation. */
+:root {
+  --bg: #1a1c26;
+  --panel: #232634;
+  --panel2: #2c3042;
+  --ink: #eef1f7;
+  --dim: #a3abc0;
+  --line: rgba(255,255,255,0.09);
+  --accent: #7fd1a6;
+  --accent2: #ffcf7a;
+  --bad: #ff8f7a;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 ui-rounded, "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr) auto auto;
+  max-width: 1180px; margin: 0 auto;
+  overflow: hidden;
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #262a3a, #21243180);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h1 {
+  margin: 0; flex: none; font-size: 19px; letter-spacing: .3px; font-weight: 800;
+  background: linear-gradient(92deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.worldinfo { color: var(--dim); font-size: 12.5px; flex: none; white-space: nowrap; }
+.worldinfo .sep { opacity: .5; margin: 0 4px; }
+.spacer { flex: 1; }
+
+.speed { display: flex; background: var(--panel); border-radius: 999px; padding: 3px; border: 1px solid var(--line); }
+.speed button {
+  border: 0; background: transparent; color: var(--dim);
+  padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+}
+.speed button.on { background: var(--accent); color: #16241d; }
+
+button.ghost {
+  background: var(--panel); border: 1px solid var(--line); color: var(--dim);
+  border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 12.5px;
+}
+button.ghost:hover { color: var(--ink); border-color: rgba(255,255,255,.22); }
+button.ghost.on { background: var(--accent); color: #16241d; border-color: transparent; }
+button.primary {
+  background: var(--accent); color: #16241d; border: 0;
+  border-radius: 999px; padding: 7px 14px; font-weight: 800;
+}
+button.primary:hover { filter: brightness(1.08); }
+
+/* ---------- stage ---------- */
+#stage { position: relative; min-height: 0; }
+#view { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+.tools {
+  position: absolute; left: 10px; top: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tools button {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(28,31,44,.82); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); color: var(--dim);
+  border-radius: 10px; padding: 6px 10px 6px 8px; font-size: 12px; font-weight: 700;
+  min-width: 92px;
+}
+.tools button span { font-size: 16px; filter: saturate(1.1); }
+.tools button.on { background: var(--accent); color: #16241d; border-color: transparent; }
+
+.journal {
+  position: absolute; right: 10px; top: 10px; width: min(260px, 42vw);
+  display: flex; flex-direction: column; gap: 4px; pointer-events: none;
+}
+.journal div {
+  background: rgba(24,27,38,.78); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 9px; font-size: 11.5px; color: #d8dee8;
+  animation: fadein .3s ease;
+}
+@keyframes fadein { from { opacity: 0; transform: translateY(-4px); } }
+
+.toast {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  background: rgba(24,27,38,.92); border: 1px solid var(--line);
+  padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+}
+
+/* ---------- word bar ---------- */
+.wordbar {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 7px 12px; background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.wblabel { color: var(--dim); font-weight: 800; font-size: 12px; flex: none; }
+.words { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin;
+  flex: 1 1 auto; min-width: 0; }
+.words button {
+  flex: none; background: var(--panel2); border: 1px solid var(--line);
+  color: var(--ink); border-radius: 999px; padding: 4px 11px;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  position: relative;
+}
+.words button:hover { border-color: var(--accent); }
+.words button.known::after {
+  content: ''; position: absolute; left: 8px; right: 8px; bottom: 2px; height: 2px;
+  border-radius: 2px; background: var(--accent);
+  transform: scaleX(var(--know, 0)); transform-origin: left;
+}
+.words .grp { width: 1px; background: var(--line); margin: 2px 3px; flex: none; }
+
+/* ---------- hud ---------- */
+#hud {
+  display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) minmax(0,auto);
+  min-width: 0;
+  gap: 12px; align-items: center;
+  padding: 9px 12px; background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.who { display: flex; gap: 10px; align-items: center; min-width: 0; }
+#portrait { width: 58px; height: 58px; border-radius: 12px; background: #1b1f2c; flex: none; }
+.whotext { min-width: 0; }
+.nameline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.nameline strong { font-size: 15.5px; }
+.pill {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+  background: var(--panel2); border: 1px solid var(--line);
+  padding: 1px 7px; border-radius: 999px; color: var(--dim);
+}
+.status { color: var(--dim); font-size: 12.5px; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vocab { font-size: 11px; color: #8d95ab; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.needs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.need { display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 6px; font-size: 11px; }
+.need i { font-style: normal; color: var(--dim); }
+.bar { height: 7px; border-radius: 999px; background: #171a25; overflow: hidden; }
+.bar em { display: block; height: 100%; border-radius: 999px; transition: width .25s ease; }
+
+.roster { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#rosterList { display: flex; gap: 4px; max-width: 210px; overflow-x: auto; min-width: 0; }
+.chip {
+  display: flex; align-items: center; gap: 5px; flex: none;
+  background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 9px 3px 5px; font-size: 12px; font-weight: 700;
+}
+.chip.on { border-color: var(--accent); }
+.chip.dead { opacity: .45; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+
+/* ---------- science drawer ---------- */
+.science {
+  position: fixed; right: 0; top: 0; bottom: 0; width: min(420px, 94vw);
+  background: #1e212d; border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; z-index: 20;
+  box-shadow: -18px 0 44px rgba(0,0,0,.45);
+}
+.scihead { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 4px; flex: 1; }
+.tabs button {
+  background: transparent; border: 1px solid transparent; color: var(--dim);
+  border-radius: 8px; padding: 5px 9px; font-size: 12.5px; font-weight: 700;
+}
+.tabs button.on { background: var(--panel2); color: var(--ink); border-color: var(--line); }
+.scibody { padding: 10px 12px 24px; overflow-y: auto; font-size: 12.5px; }
+.scibody h4 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--dim); }
+.scibody h4:first-child { margin-top: 0; }
+.crow { display: grid; grid-template-columns: 96px minmax(0,1fr) 62px; gap: 7px; align-items: center; margin: 3px 0; }
+.crow span { color: var(--dim); font-size: 11px; }
+.crow b { font-weight: 700; font-size: 11px; text-align: right; color: #c3cadb;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { color: var(--dim); font-size: 11.5px; margin: 6px 0 0; }
+.genelist { max-height: none; }
+.gene { display: flex; gap: 6px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.gene b { color: var(--accent2); font-weight: 700; min-width: 62px; font-size: 11px; }
+.gene span { color: var(--dim); font-size: 11.5px; }
+.wordrow { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0;
+  border-bottom: 1px dashed var(--line); }
+.wordrow b { color: var(--accent); }
+.wordrow span { color: var(--dim); }
+
+/* ---------- modal ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(10,12,18,.72); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.sheet {
+  background: #20232f; border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px 22px; max-width: 560px; max-height: 88vh; overflow-y: auto;
+}
+.sheet h2 { margin: 0 0 6px; font-size: 22px;
+  background: linear-gradient(92deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sheet h3 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--accent2); }
+.sheet p, .sheet li { color: #cfd6e5; font-size: 13.5px; }
+.sheet ul { padding-left: 18px; margin: 6px 0; }
+.sheet li { margin: 4px 0; }
+.sheet .quiet { color: var(--dim); font-size: 12.5px; }
+.sheetbtns { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+
+[hidden] { display: none !important; }
+
+@media (max-width: 720px) {
+  #hud { grid-template-columns: 1fr; gap: 8px; }
+  .roster { justify-content: space-between; }
+  #rosterList { max-width: none; flex: 1; }
+  .needs { grid-template-columns: 1fr 1fr; }
+  .tools button { min-width: 0; padding: 6px 8px; }
+  .tools button b { display: none; }
+  .journal { width: 40vw; }
+}
+
+</style>
+<div id="app">
+
+  <header class="topbar">
+    <h1>Sprigs</h1>
+    <div class="worldinfo">
+      <span id="dayLabel">Day 1</span>
+      <span class="sep">·</span>
+      <span id="popLabel">2 sprigs</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="speed" role="group" aria-label="Speed">
+      <button data-speed="0" title="Pause">❚❚</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="3">3×</button>
+      <button data-speed="8">8×</button>
+    </div>
+    <button id="btnScience" class="ghost" title="Look inside">Inside</button>
+    <button id="btnHelp" class="ghost" title="How to play">?</button>
+  </header>
+
+  <main id="stage">
+    <canvas id="view"></canvas>
+
+    <div class="tools" role="group" aria-label="What your hand does">
+      <button data-tool="point" class="on"><span>👆</span><b>Point</b></button>
+      <button data-tool="carry"><span>✋</span><b>Carry</b></button>
+      <button data-tool="tickle"><span>🪶</span><b>Tickle</b></button>
+      <button data-tool="scold"><span>👎</span><b>Scold</b></button>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="journal" class="journal" aria-live="polite"></div>
+  </main>
+
+  <div id="wordbar" class="wordbar">
+    <span class="wblabel">Say:</span>
+    <div id="words" class="words"></div>
+  </div>
+
+  <footer id="hud">
+    <div class="who">
+      <canvas id="portrait" width="76" height="76"></canvas>
+      <div class="whotext">
+        <div class="nameline">
+          <strong id="cName">—</strong>
+          <span id="cStage" class="pill"></span>
+          <span id="cSex" class="pill"></span>
+        </div>
+        <div id="cStatus" class="status">Waiting for an egg to hatch…</div>
+        <div id="cVocab" class="vocab"></div>
+      </div>
+    </div>
+    <div id="needs" class="needs"></div>
+    <div class="roster">
+      <div id="rosterList"></div>
+      <button id="btnEgg" class="primary" title="Add a new sprig from a fresh genome">＋ New egg</button>
+    </div>
+  </footer>
+
+  <aside id="science" class="science" hidden>
+    <div class="scihead">
+      <div class="tabs" role="tablist">
+        <button data-tab="chem" class="on">Chemistry</button>
+        <button data-tab="brain">Mind</button>
+        <button data-tab="genes">Genes</button>
+        <button data-tab="family">Family</button>
+      </div>
+      <button id="btnCloseSci" class="ghost">✕</button>
+    </div>
+    <div id="sciBody" class="scibody"></div>
+  </aside>
+
+  <div id="help" class="modal" hidden>
+    <div class="sheet">
+      <h2>Sprigs</h2>
+      <p>A sprig is not scripted. It has a body full of chemicals, a small brain
+         that learns from how it feels, and a genome that decides how both are
+         wired. Nothing it does was written down in advance.</p>
+      <h3>Looking after one</h3>
+      <ul>
+        <li><b>Point</b> at something to draw a sprig's attention to it — and to
+            teach it that thing's name.</li>
+        <li><b>Tickle</b> to praise. Whatever it was just doing, it will do more
+            of. <b>Scold</b> to discourage. Both work through real chemistry, so
+            they take a few seconds to sink in.</li>
+        <li><b>Carry</b> to pick things up — including sprigs. Put a cold one by
+            the lamp, or two grown ones together.</li>
+        <li><b>Say</b> a word from the bar. Say it while a sprig can see what you
+            mean and it will slowly work out what the word refers to. Eventually
+            it will use the word back at you.</li>
+      </ul>
+      <h3>The valley</h3>
+      <p>Berries and bushes are food. Pools are water. The lamp is warm, the
+         grotto in the west is cold. The white-flowered herb cures illness. The
+         purple weeds out past the lamp are poisonous — a sprig has to learn that
+         the hard way, and it will remember.</p>
+      <h3>Growing up</h3>
+      <p>Sprigs pass through baby, child, adolescent, adult and elder. Two adults
+         who spend time together may lay an egg, and the hatchling's genome is a
+         genuine mix of theirs with mutations of its own. Colour, shape, appetite,
+         temper and how quickly it learns are all inherited.</p>
+      <p class="quiet">Open <b>Inside</b> to watch the chemistry, the mind and the
+         genome of whichever sprig is selected.</p>
+      <div class="sheetbtns">
+        <button id="btnCloseHelp" class="primary">Let me in</button>
+        <button id="btnReset" class="ghost">Start a new valley</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+/* ===== src/util.js ===== */
+/* Sprigs - shared utilities.
+ * Every module attaches to the global CG namespace so the game runs from a
+ * plain file:// double-click with no build step and no module loader. */
+(function (CG) {
+  'use strict';
+
+  /* ---------- deterministic random ---------- */
+  function RNG(seed) {
+    this.s = (seed >>> 0) || 1;
+  }
+  RNG.prototype.next = function () {
+    var a = (this.s = (this.s + 0x6D2B79F5) | 0);
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  RNG.prototype.range = function (lo, hi) { return lo + this.next() * (hi - lo); };
+  RNG.prototype.int = function (n) { return Math.floor(this.next() * n) % n; };
+  RNG.prototype.pick = function (arr) { return arr[this.int(arr.length)]; };
+  RNG.prototype.chance = function (p) { return this.next() < p; };
+  /* Box-Muller, cached second sample. */
+  RNG.prototype.gauss = function () {
+    if (this._g != null) { var g = this._g; this._g = null; return g; }
+    var u = Math.max(1e-9, this.next()), v = this.next();
+    var m = Math.sqrt(-2 * Math.log(u));
+    this._g = m * Math.sin(2 * Math.PI * v);
+    return m * Math.cos(2 * Math.PI * v);
+  };
+  RNG.prototype.fork = function () { return new RNG((this.next() * 4294967296) >>> 0); };
+
+  /* ---------- maths ---------- */
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function approach(cur, target, rate, dt) { return cur + (target - cur) * (1 - Math.exp(-rate * dt)); }
+  function sq(x) { return x * x; }
+  /* Smooth 0..1 response curve used all over the biology. */
+  function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
+  function softsat(x) { return x / (1 + Math.abs(x)); }
+
+  /* ---------- ids and names ---------- */
+  var idCounter = 1;
+  function uid(prefix) { return (prefix || 'x') + (idCounter++) + '-' + Math.floor(Math.random() * 46656).toString(36); }
+
+  var HEAD = ['b', 'br', 'c', 'd', 'f', 'g', 'j', 'k', 'l', 'm', 'n', 'p', 'pl', 'q', 'r', 's', 'sh', 't', 'th', 'tr', 'v', 'w', 'z'];
+  var VOW = ['a', 'e', 'i', 'o', 'u', 'ee', 'oo', 'ai', 'ou', 'ey'];
+  var TAIL = ['b', 'd', 'ff', 'k', 'l', 'm', 'n', 'p', 'sh', 't', 'x', 'z', 'ble', 'kin', 'let', 'ns'];
+  /* Random syllables occasionally spell something you would not want to name a
+   * pet. Cheap to check, and worth checking. */
+  var UNLOVELY = ['sex', 'ass', 'tit', 'cum', 'fuk', 'fuc', 'cok', 'coc', 'dik', 'dic',
+    'pis', 'shi', 'sht', 'wank', 'twat', 'cunt', 'nig', 'fag', 'rape', 'anal', 'anus',
+    'poo', 'pee', 'bum', 'nazi', 'kkk', 'hell', 'damn'];
+  function unlovely(name) {
+    var n = name.toLowerCase();
+    for (var i = 0; i < UNLOVELY.length; i++) if (n.indexOf(UNLOVELY[i]) >= 0) return true;
+    return false;
+  }
+
+  function makeName(rng) {
+    for (var tries = 0; tries < 12; tries++) {
+      var candidate = makeNameOnce(rng);
+      if (!unlovely(candidate)) return candidate;
+    }
+    return 'Pip';
+  }
+
+  function makeNameOnce(rng) {
+    var n = rng.pick(HEAD) + rng.pick(VOW);
+    if (rng.chance(0.55)) n += rng.pick(TAIL) + rng.pick(VOW);
+    n += rng.chance(0.7) ? rng.pick(TAIL) : '';
+    n = n.charAt(0).toUpperCase() + n.slice(1);
+    return n.length > 9 ? n.slice(0, 9) : n;
+  }
+
+  /* ---------- misc ---------- */
+  function fmtAge(seconds) {
+    var m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
+    if (m < 60) return m + 'm ' + s + 's';
+    return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+  }
+  function shallow(o) { var r = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; return r; }
+
+  CG.RNG = RNG;
+  CG.clamp = clamp; CG.clamp01 = clamp01; CG.lerp = lerp; CG.approach = approach;
+  CG.sq = sq; CG.sigmoid = sigmoid; CG.softsat = softsat;
+  CG.uid = uid; CG.makeName = makeName; CG.fmtAge = fmtAge; CG.shallow = shallow;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/chemistry.js ===== */
+/* Sprigs - biochemistry.
+ *
+ * A sprig's body is a soup of 30 chemicals. Nothing in the creature reads the
+ * world directly: events raise chemicals (emitters), chemicals turn into other
+ * chemicals (reactions), and chemicals are finally read back out as drives and
+ * body parameters (receptors). All three tables live in the genome, so a
+ * mutation can rewire the metabolism of a whole bloodline. */
+(function (CG) {
+  'use strict';
+
+  var CHEMS = [
+    /* 0  */ 'glucose',    /* usable energy */
+    /* 1  */ 'starch',     /* slow food store, digests into glucose */
+    /* 2  */ 'water',
+    /* 3  */ 'fat',        /* long term reserve */
+    /* 4  */ 'protein',    /* needed to grow */
+    /* 5  */ 'hungersig',
+    /* 6  */ 'thirstsig',
+    /* 7  */ 'fatiguesig',
+    /* 8  */ 'lonelysig',
+    /* 9  */ 'boredsig',
+    /* 10 */ 'fearsig',
+    /* 11 */ 'painsig',
+    /* 12 */ 'coldsig',
+    /* 13 */ 'heatsig',
+    /* 14 */ 'reward',     /* raw praise, becomes endorphin */
+    /* 15 */ 'punish',     /* raw scolding, becomes cortisol */
+    /* 16 */ 'adrenaline',
+    /* 17 */ 'endorphin',  /* the learning signal, positive half */
+    /* 18 */ 'cortisol',   /* the learning signal, negative half */
+    /* 19 */ 'growth',
+    /* 20 */ 'sexdrive',
+    /* 21 */ 'toxin',
+    /* 22 */ 'antitoxin',
+    /* 23 */ 'sickness',
+    /* 24 */ 'antibody',
+    /* 25 */ 'sleepiness',
+    /* 26 */ 'wakeful',
+    /* 27 */ 'affection',
+    /* 28 */ 'anger',
+    /* 29 */ 'curiosity'
+  ];
+  var CI = {};
+  for (var i = 0; i < CHEMS.length; i++) CI[CHEMS[i]] = i;
+
+  /* Chemicals a player might reasonably want to look at, in reading order. */
+  var CHEM_GROUPS = [
+    { name: 'Fuel', chems: ['glucose', 'starch', 'water', 'fat', 'protein'] },
+    { name: 'Needs', chems: ['hungersig', 'thirstsig', 'fatiguesig', 'lonelysig', 'boredsig', 'coldsig', 'heatsig', 'painsig', 'fearsig'] },
+    { name: 'Feelings', chems: ['endorphin', 'cortisol', 'adrenaline', 'affection', 'anger', 'curiosity', 'sexdrive'] },
+    { name: 'Health', chems: ['toxin', 'antitoxin', 'sickness', 'antibody', 'growth', 'sleepiness', 'wakeful'] }
+  ];
+
+  function Soup() {
+    this.c = new Float32Array(CHEMS.length);
+  }
+  Soup.prototype.get = function (name) { return this.c[CI[name]]; };
+  Soup.prototype.set = function (name, v) { this.c[CI[name]] = CG.clamp01(v); };
+  Soup.prototype.add = function (name, v) {
+    var i = CI[name];
+    this.c[i] = CG.clamp01(this.c[i] + v);
+  };
+  Soup.prototype.addIdx = function (i, v) { this.c[i] = CG.clamp01(this.c[i] + v); };
+
+  /* Scratch snapshot shared by every soup: the sim is single threaded and a
+   * step never yields, so one buffer is enough and it keeps Soup serialisable. */
+  var SNAP = new Float32Array(CHEMS.length);
+
+  /* One simulation step of the whole soup.
+   * reactions: [{a,b,ca,cb,out:[[idx,amt],..],rate}]  (b < 0 means unimolecular)
+   * halfLife:  Float32Array, seconds for each chemical to halve (0 = stable) */
+  Soup.prototype.step = function (dt, reactions, halfLife) {
+    var c = this.c, n = c.length, k, r, amount, j;
+
+    /* Reactions are evaluated against a snapshot so ordering inside the genome
+     * cannot give an early gene an unfair claim on a scarce reactant. */
+    SNAP.set(c);
+
+    for (k = 0; k < reactions.length; k++) {
+      r = reactions[k];
+      /* Mass action: unimolecular is first order in A, bimolecular second order. */
+      amount = r.rate * dt * SNAP[r.a];
+      if (r.b >= 0) amount *= SNAP[r.b];
+      if (amount <= 1e-7) continue;
+      /* Never consume more of either reactant than the body actually holds. */
+      amount = Math.min(amount, SNAP[r.a] / r.ca);
+      if (r.b >= 0) amount = Math.min(amount, SNAP[r.b] / r.cb);
+      c[r.a] = Math.max(0, c[r.a] - amount * r.ca);
+      if (r.b >= 0) c[r.b] = Math.max(0, c[r.b] - amount * r.cb);
+      for (j = 0; j < r.out.length; j++) {
+        c[r.out[j][0]] = CG.clamp01(c[r.out[j][0]] + amount * r.out[j][1]);
+      }
+    }
+
+    for (k = 0; k < n; k++) {
+      var hl = halfLife[k];
+      if (hl > 0 && c[k] > 0) c[k] *= Math.pow(0.5, dt / hl);
+      if (c[k] < 1e-6) c[k] = 0;
+    }
+  };
+
+  CG.CHEMS = CHEMS;
+  CG.CI = CI;
+  CG.CHEM_GROUPS = CHEM_GROUPS;
+  CG.Soup = Soup;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/genome.js ===== */
+/* Sprigs - genetics.
+ *
+ * A genome is a flat list of genes. Six kinds exist:
+ *   trait     - a single number: body shape, colour, metabolism, temperament
+ *   reaction  - one chemical reaction in the body
+ *   halflife  - how fast a chemical drains away
+ *   emitter   - a body/world condition that pours a chemical into the soup
+ *   receptor  - a chemical that is read back out as a drive or body parameter
+ *   instinct  - a hardwired nudge in the brain, present from birth
+ *
+ * Genes carry a stable key so two genomes can be lined up for breeding, and a
+ * per-gene mutability so some parts of the design drift faster than others. */
+(function (CG) {
+  'use strict';
+
+  var CI = CG.CI;
+
+  /* Drives are the creature's felt needs. The brain sees exactly these. */
+  var DRIVES = ['hunger', 'thirst', 'fatigue', 'lonely', 'bored', 'cold', 'hot', 'pain', 'fear', 'sexdrive', 'sick'];
+  var DRIVE_LABEL = {
+    hunger: 'Hungry', thirst: 'Thirsty', fatigue: 'Sleepy', lonely: 'Lonely', bored: 'Bored',
+    cold: 'Cold', hot: 'Too hot', pain: 'Hurt', fear: 'Scared', sexdrive: 'Amorous', sick: 'Ill'
+  };
+
+  /* Body conditions an emitter gene is allowed to watch. */
+  var EMITTER_SOURCES = ['lowGlucose', 'lowWater', 'awake', 'alone', 'unstimulated', 'threat',
+    'injury', 'chilly', 'sweaty', 'mature', 'exertion', 'night', 'sickLoad', 'toxLoad', 'crowded'];
+
+  /* What a receptor gene is allowed to drive. */
+  var RECEPTOR_TARGETS = DRIVES.map(function (d) { return 'drive:' + d; })
+    .concat(['param:speed', 'param:learnRate', 'param:metabolism', 'param:boldness', 'param:growth', 'param:focus']);
+
+  /* trait key: [min, max, default, mutability] */
+  var TRAITS = {
+    /* looks */
+    hue: [0, 360, 120, 26], hue2: [0, 360, 40, 26], sat: [0.2, 0.95, 0.55, 0.07], light: [0.35, 0.75, 0.55, 0.05],
+    bodySize: [0.6, 1.6, 1.0, 0.07], headSize: [0.6, 1.5, 1.0, 0.07], earLen: [0.1, 2.0, 0.9, 0.12],
+    legLen: [0.5, 1.7, 1.0, 0.09], eyeSize: [0.5, 1.6, 1.0, 0.08], snout: [0.2, 1.6, 0.8, 0.1],
+    tailLen: [0.0, 2.0, 0.8, 0.14], pattern: [0, 3.99, 1.0, 0.35], spots: [0, 1, 0.4, 0.12],
+    /* body */
+    metabolism: [0.4, 2.2, 1.0, 0.09], digestRate: [0.4, 2.2, 1.0, 0.09], appetite: [0.5, 1.8, 1.0, 0.09],
+    lifespan: [900, 5400, 2400, 0.11], immunity: [0.2, 2.0, 1.0, 0.12], fertility: [0.2, 2.0, 1.0, 0.13],
+    tempPref: [0.25, 0.8, 0.5, 0.08], stamina: [0.5, 1.6, 1.0, 0.08],
+    /* mind */
+    learnRate: [0.25, 2.2, 1.0, 0.11], curiosity: [0.2, 2.0, 1.0, 0.13], boldness: [0.2, 2.0, 1.0, 0.13],
+    sociability: [0.2, 2.0, 1.0, 0.13], patience: [0.3, 2.0, 1.0, 0.12], forgetRate: [0.3, 2.0, 1.0, 0.1],
+    tempers: [0.2, 2.0, 1.0, 0.14], wordMemory: [0.3, 2.2, 1.0, 0.12],
+    /* meta */
+    mutability: [0.25, 3.0, 1.0, 0.16]
+  };
+
+  function traitGene(key, value) {
+    var d = TRAITS[key];
+    return { t: 'trait', k: 'trait:' + key, key: key, v: CG.clamp(value, d[0], d[1]), mut: d[3] };
+  }
+
+  /* ---------- the wild-type genome ---------- */
+  /* Hand-authored so a fresh sprig is viable; every number is still a gene and
+   * every gene is still free to mutate away from here. */
+  function wildType(rng) {
+    var g = [], k;
+
+    for (k in TRAITS) {
+      if (!Object.prototype.hasOwnProperty.call(TRAITS, k)) continue;
+      var d = TRAITS[k];
+      /* Individuals start scattered around the wild-type value. */
+      var spread = (d[1] - d[0]) * 0.13;
+      g.push(traitGene(k, d[2] + rng.gauss() * spread));
+    }
+    /* Colour is worth scattering widely so a starting pair looks unrelated. */
+    g[0].v = rng.range(0, 360); g[1].v = rng.range(0, 360);
+
+    function rx(name, a, ca, b, cb, out, rate) {
+      g.push({ t: 'reaction', k: 'rx:' + name, a: CI[a], ca: ca, b: b ? CI[b] : -1, cb: cb, rate: rate, mut: 0.1,
+        out: out.map(function (o) { return [CI[o[0]], o[1]]; }) });
+    }
+    /* digestion and energy */
+    rx('digest', 'starch', 1, 'water', 0.2, [['glucose', 1.6]], 0.14);
+    /* Storing fat is second order in glucose, so it only really happens when
+     * glucose is plentiful - a threshold effect from plain mass action. */
+    rx('store', 'glucose', 1, 'glucose', 1, [['fat', 0.5]], 0.006);
+    rx('mobilise', 'fat', 1, null, 0, [['glucose', 0.9]], 0.008);
+    rx('build', 'protein', 1, 'glucose', 0.4, [['growth', 1.2]], 0.02);
+    /* feelings: raw praise and scolding are refined into learning signals */
+    rx('praise', 'reward', 1, null, 0, [['endorphin', 1.1], ['affection', 0.5]], 1.2);
+    rx('scold', 'punish', 1, null, 0, [['cortisol', 1.1], ['anger', 0.35]], 1.2);
+    rx('rush', 'fearsig', 1, null, 0, [['adrenaline', 0.8]], 0.5);
+    rx('temper', 'painsig', 1, null, 0, [['anger', 0.5], ['adrenaline', 0.4]], 0.35);
+    rx('comfort', 'endorphin', 1, 'cortisol', 1, [], 0.9);
+    /* illness */
+    rx('poison', 'toxin', 1, null, 0, [['sickness', 0.9], ['painsig', 0.4]], 0.32);
+    rx('detox', 'toxin', 1, 'antitoxin', 1, [], 1.4);
+    rx('immune', 'sickness', 1, 'antibody', 1, [], 1.1);
+    rx('malaise', 'sickness', 1, 'glucose', 0.3, [['fatiguesig', 0.5]], 0.15);
+    /* sleep pressure */
+    rx('rouse', 'sleepiness', 1, 'wakeful', 1, [], 1.0);
+    rx('doze', 'sleepiness', 1, null, 0, [['fatiguesig', 0.8]], 0.4);
+
+    function hl(chem, seconds) {
+      g.push({ t: 'halflife', k: 'hl:' + chem, c: CI[chem], hl: seconds, mut: 0.12 });
+    }
+    hl('glucose', 0); hl('starch', 0); hl('water', 0); hl('fat', 0); hl('protein', 0);
+    hl('hungersig', 12); hl('thirstsig', 12); hl('fatiguesig', 20); hl('lonelysig', 25);
+    hl('boredsig', 18); hl('fearsig', 6); hl('painsig', 14); hl('coldsig', 8); hl('heatsig', 8);
+    hl('reward', 1.2); hl('punish', 1.2); hl('adrenaline', 8); hl('endorphin', 5); hl('cortisol', 7);
+    hl('growth', 30); hl('sexdrive', 45); hl('toxin', 90); hl('antitoxin', 25); hl('sickness', 240);
+    hl('antibody', 60); hl('sleepiness', 40); hl('wakeful', 30); hl('affection', 40); hl('anger', 20);
+    hl('curiosity', 15);
+
+    function em(src, chem, thresh, gain, invert) {
+      g.push({ t: 'emitter', k: 'em:' + src + '>' + chem, src: src, chem: CI[chem],
+        thresh: thresh, gain: gain, invert: !!invert, mut: 0.12 });
+    }
+    em('lowGlucose', 'hungersig', 0.42, 0.85);
+    em('lowWater', 'thirstsig', 0.4, 0.85);
+    em('awake', 'sleepiness', 0.45, 0.4);
+    em('night', 'sleepiness', 0.5, 0.35);
+    em('alone', 'lonelysig', 0.5, 0.25);
+    em('crowded', 'boredsig', 0.9, 0.2, true);
+    em('unstimulated', 'boredsig', 0.45, 0.22);
+    em('unstimulated', 'curiosity', 0.35, 0.35);
+    em('threat', 'fearsig', 0.15, 1.1);
+    em('injury', 'painsig', 0.05, 1.0);
+    em('chilly', 'coldsig', 0.32, 0.6);
+    em('sweaty', 'heatsig', 0.32, 0.6);
+    em('mature', 'sexdrive', 0.6, 0.16);
+    em('mature', 'growth', 0.85, 0.1, true);
+    em('exertion', 'wakeful', 0.35, 0.35);
+    em('sickLoad', 'antibody', 0.22, 0.16);
+    em('toxLoad', 'antitoxin', 0.28, 0.14);
+
+    function rc(chem, tgt, thresh, gain, invert) {
+      g.push({ t: 'receptor', k: 'rc:' + chem + '>' + tgt, chem: CI[chem], tgt: tgt,
+        thresh: thresh, gain: gain, invert: !!invert, mut: 0.12 });
+    }
+    rc('hungersig', 'drive:hunger', 0, 1.0);
+    rc('thirstsig', 'drive:thirst', 0, 1.0);
+    rc('fatiguesig', 'drive:fatigue', 0, 1.0);
+    rc('lonelysig', 'drive:lonely', 0, 1.0);
+    rc('boredsig', 'drive:bored', 0, 1.0);
+    rc('coldsig', 'drive:cold', 0, 1.0);
+    rc('heatsig', 'drive:hot', 0, 1.0);
+    rc('painsig', 'drive:pain', 0, 1.0);
+    rc('fearsig', 'drive:fear', 0, 1.0);
+    rc('sexdrive', 'drive:sexdrive', 0.15, 1.0);
+    rc('sickness', 'drive:sick', 0.08, 1.0);
+    rc('adrenaline', 'param:speed', 0, 0.5);
+    rc('glucose', 'param:speed', 0.15, 0.35);
+    rc('endorphin', 'param:learnRate', 0, 0.9);
+    rc('cortisol', 'param:learnRate', 0, 0.7);
+    rc('anger', 'param:boldness', 0, 0.6);
+    rc('cortisol', 'param:boldness', 0, -0.5);
+    rc('growth', 'param:growth', 0, 1.0);
+    rc('curiosity', 'param:focus', 0, -0.6);
+    rc('sickness', 'param:metabolism', 0, -0.35);
+
+    /* Instincts: what a newborn already half-knows. Weak on purpose - they are
+     * a starting bias, not a solution, and learning overwrites them. */
+    function inst(cue, action, w) {
+      g.push({ t: 'instinct', k: 'in:' + cue + '>' + action, cue: cue, action: action, w: w, mut: 0.2 });
+    }
+    inst('hunger+food', 'eat', 3.0);
+    inst('hunger+food', 'approach', 2.2);
+    inst('thirst+drink', 'drink', 3.0);
+    inst('thirst+drink', 'approach', 2.2);
+    inst('fatigue+any', 'sleep', 1.8);
+    inst('bored+toy', 'play', 1.2);
+    inst('bored+toy', 'approach', 0.7);
+    inst('lonely+creature', 'approach', 1.6);
+    inst('lonely+creature', 'call', 1.2);
+    inst('fear+any', 'retreat', 2.0);
+    inst('sick+medicine', 'eat', 1.8);
+    inst('sexdrive+creature', 'mate', 1.6);
+    inst('sexdrive+creature', 'approach', 1.2);
+    inst('any+none', 'wander', 0.5);
+    inst('hunger+none', 'wander', 1.1);
+    inst('thirst+none', 'wander', 1.1);
+    inst('bored+any', 'wander', 0.6);
+
+    return { id: CG.uid('gn'), gen: 1, genes: g, born: 0 };
+  }
+
+  /* ---------- mutation ---------- */
+  function jitter(rng, v, amount, lo, hi) {
+    var span = (hi - lo);
+    return CG.clamp(v + rng.gauss() * amount * span * 0.25, lo, hi);
+  }
+
+  function mutateGene(gene, rng, strength) {
+    var g = CG.shallow(gene), i;
+    var m = (gene.mut || 0.1) * strength;
+    if (gene.t === 'trait') {
+      var d = TRAITS[gene.key];
+      if (!d) return g;
+      g.v = jitter(rng, g.v, m, d[0], d[1]);
+    } else if (gene.t === 'reaction') {
+      g.rate = CG.clamp(g.rate * Math.exp(rng.gauss() * m), 0.001, 4);
+      if (rng.chance(0.15 * strength)) g.ca = CG.clamp(g.ca * Math.exp(rng.gauss() * m), 0.05, 3);
+      if (rng.chance(0.15 * strength) && g.b >= 0) g.cb = CG.clamp(g.cb * Math.exp(rng.gauss() * m), 0.05, 3);
+      if (rng.chance(0.2 * strength)) {
+        g.out = g.out.map(function (o) { return [o[0], CG.clamp(o[1] * Math.exp(rng.gauss() * m), 0.02, 3)]; });
+      }
+      /* rare rewiring: a product is redirected to a different chemical */
+      if (rng.chance(0.03 * strength) && g.out.length) {
+        g.out = g.out.slice();
+        i = rng.int(g.out.length);
+        g.out[i] = [rng.int(CG.CHEMS.length), g.out[i][1]];
+        g.k = g.k + '*';
+      }
+    } else if (gene.t === 'halflife') {
+      g.hl = g.hl === 0 ? 0 : CG.clamp(g.hl * Math.exp(rng.gauss() * m), 0.4, 900);
+    } else if (gene.t === 'emitter' || gene.t === 'receptor') {
+      g.thresh = CG.clamp(g.thresh + rng.gauss() * m * 0.25, 0, 0.95);
+      g.gain = CG.clamp(g.gain * Math.exp(rng.gauss() * m), -3, 3);
+      if (rng.chance(0.02 * strength)) { g.invert = !g.invert; g.k = g.k + '*'; }
+      if (rng.chance(0.03 * strength)) {
+        /* rewire: point this gene at a different chemical */
+        g.chem = rng.int(CG.CHEMS.length);
+        g.k = (gene.t === 'emitter' ? 'em:' + g.src : 'rc:' + CG.CHEMS[g.chem]) + '>' + (g.tgt || CG.CHEMS[g.chem]) + '~' + rng.int(9999);
+      }
+    } else if (gene.t === 'instinct') {
+      g.w = CG.clamp(g.w + rng.gauss() * m * 0.6, -2.5, 3);
+    }
+    return g;
+  }
+
+  function structuralMutation(genes, rng, strength) {
+    var out = genes.slice(), i, g;
+    /* duplication - the main way genomes gain new machinery */
+    if (rng.chance(0.06 * strength)) {
+      i = rng.int(out.length);
+      g = mutateGene(out[i], rng, 3);
+      g.k = g.k + '#' + rng.int(9999);
+      out.push(g);
+    }
+    /* loss - usually harmless, occasionally fatal, which is the point */
+    if (rng.chance(0.05 * strength) && out.length > 40) {
+      i = rng.int(out.length);
+      if (out[i].t !== 'trait') out.splice(i, 1);
+    }
+    /* a brand new reflex arc appears out of nowhere */
+    if (rng.chance(0.03 * strength)) {
+      out.push({ t: 'receptor', k: 'rc:new' + rng.int(99999),
+        chem: rng.int(CG.CHEMS.length), tgt: rng.pick(RECEPTOR_TARGETS),
+        thresh: rng.range(0, 0.5), gain: rng.range(-1, 1.4), invert: rng.chance(0.2), mut: 0.2 });
+    }
+    if (rng.chance(0.03 * strength)) {
+      out.push({ t: 'emitter', k: 'em:new' + rng.int(99999),
+        src: rng.pick(EMITTER_SOURCES), chem: rng.int(CG.CHEMS.length),
+        thresh: rng.range(0, 0.6), gain: rng.range(0.05, 0.9), invert: rng.chance(0.2), mut: 0.2 });
+    }
+    return out;
+  }
+
+  function mutate(genome, rng, strength) {
+    strength = strength == null ? 1 : strength;
+    var genes = genome.genes.map(function (g) {
+      return rng.chance(0.16 * strength) ? mutateGene(g, rng, strength) : g;
+    });
+    genes = structuralMutation(genes, rng, strength);
+    return { id: CG.uid('gn'), gen: genome.gen, genes: genes, born: 0,
+      mumId: genome.mumId, dadId: genome.dadId };
+  }
+
+  /* ---------- breeding ---------- */
+  function crossover(a, b, rng) {
+    var byKey = {}, order = [], i, g, key;
+    function index(genome, slot) {
+      for (i = 0; i < genome.genes.length; i++) {
+        g = genome.genes[i]; key = g.k;
+        if (!byKey[key]) { byKey[key] = { a: null, b: null }; order.push(key); }
+        byKey[key][slot] = g;
+      }
+    }
+    index(a, 'a'); index(b, 'b');
+
+    var genes = [];
+    for (i = 0; i < order.length; i++) {
+      var pair = byKey[order[i]];
+      if (pair.a && pair.b) {
+        /* Both parents carry this gene. Usually take one intact allele; now and
+         * then the two blend, which lets quantitative traits drift smoothly. */
+        if (rng.chance(0.25) && pair.a.t === pair.b.t) genes.push(blend(pair.a, pair.b, rng));
+        else genes.push(rng.chance(0.5) ? pair.a : pair.b);
+      } else {
+        /* Carried by one parent only - inherited about half the time. */
+        if (rng.chance(0.5)) genes.push(pair.a || pair.b);
+      }
+    }
+    var strength = 0.5 * (traitOf(a, 'mutability') + traitOf(b, 'mutability'));
+    var child = mutate({ id: '', gen: 0, genes: genes }, rng, strength);
+    child.gen = Math.max(a.gen || 1, b.gen || 1) + 1;
+    child.mumId = a.id; child.dadId = b.id;
+    return child;
+  }
+
+  function blend(x, y, rng) {
+    var g = CG.shallow(x), t = rng.range(0.3, 0.7);
+    if (x.t === 'trait') g.v = CG.lerp(x.v, y.v, t);
+    else if (x.t === 'reaction') g.rate = CG.lerp(x.rate, y.rate, t);
+    else if (x.t === 'halflife') g.hl = CG.lerp(x.hl, y.hl, t);
+    else if (x.t === 'instinct') g.w = CG.lerp(x.w, y.w, t);
+    else { g.gain = CG.lerp(x.gain, y.gain, t); g.thresh = CG.lerp(x.thresh, y.thresh, t); }
+    return g;
+  }
+
+  function traitOf(genome, key) {
+    for (var i = 0; i < genome.genes.length; i++) {
+      if (genome.genes[i].t === 'trait' && genome.genes[i].key === key) return genome.genes[i].v;
+    }
+    return TRAITS[key] ? TRAITS[key][2] : 0;
+  }
+
+  /* ---------- compiling ---------- */
+  /* Turns the gene list into the flat tables the body reads every tick. */
+  function compile(genome) {
+    var out = {
+      traits: {}, reactions: [], halfLife: new Float32Array(CG.CHEMS.length),
+      emitters: [], receptors: [], instincts: [], lethal: null
+    };
+    var k;
+    for (k in TRAITS) if (Object.prototype.hasOwnProperty.call(TRAITS, k)) out.traits[k] = TRAITS[k][2];
+
+    var i, g;
+    for (i = 0; i < genome.genes.length; i++) {
+      g = genome.genes[i];
+      switch (g.t) {
+        case 'trait':
+          if (TRAITS[g.key]) out.traits[g.key] = CG.clamp(g.v, TRAITS[g.key][0], TRAITS[g.key][1]);
+          break;
+        case 'reaction': out.reactions.push(g); break;
+        case 'halflife': out.halfLife[g.c] = g.hl; break;
+        case 'emitter': out.emitters.push(g); break;
+        case 'receptor': out.receptors.push(g); break;
+        case 'instinct': out.instincts.push(g); break;
+      }
+    }
+    /* A genome that cannot turn food into energy makes a creature that starves
+     * in the egg. Better to know that up front than to watch it puzzle players. */
+    var canDigest = false;
+    for (i = 0; i < out.reactions.length; i++) {
+      var r = out.reactions[i];
+      for (var j = 0; j < r.out.length; j++) if (r.out[j][0] === CI.glucose) canDigest = true;
+    }
+    if (!canDigest) out.lethal = 'cannot digest food';
+    return out;
+  }
+
+  /* A short readable summary of how this genome differs from wild type. */
+  function describe(genome) {
+    var c = compile(genome), notes = [], k;
+    var interesting = { metabolism: ['slow burning', 'fast burning'], learnRate: ['slow to learn', 'quick to learn'],
+      curiosity: ['incurious', 'curious'], boldness: ['timid', 'bold'], sociability: ['solitary', 'sociable'],
+      appetite: ['light eater', 'big eater'], lifespan: ['short lived', 'long lived'],
+      immunity: ['frail', 'hardy'], tempers: ['placid', 'temperamental'], patience: ['impatient', 'patient'],
+      fertility: ['barely fertile', 'very fertile'], bodySize: ['small', 'large'] };
+    for (k in interesting) {
+      if (!Object.prototype.hasOwnProperty.call(interesting, k)) continue;
+      var d = TRAITS[k], v = c.traits[k], mid = d[2];
+      var rel = (v - mid) / (d[1] - d[0]);
+      if (rel < -0.16) notes.push(interesting[k][0]);
+      else if (rel > 0.16) notes.push(interesting[k][1]);
+    }
+    if (!notes.length) notes.push('unremarkable');
+    return notes.slice(0, 4).join(', ');
+  }
+
+  CG.DRIVES = DRIVES;
+  CG.DRIVE_LABEL = DRIVE_LABEL;
+  CG.TRAITS = TRAITS;
+  CG.EMITTER_SOURCES = EMITTER_SOURCES;
+  CG.RECEPTOR_TARGETS = RECEPTOR_TARGETS;
+  CG.genome = {
+    wildType: wildType, mutate: mutate, crossover: crossover, compile: compile,
+    traitOf: traitOf, describe: describe
+  };
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/brain.js ===== */
+/* Sprigs - the mind.
+ *
+ * Two learning systems, both small enough to watch working:
+ *
+ * 1. Decision lobe. A one-layer network from a *conjunctive* situation vector
+ *    (every drive crossed with every visible category: "hungry AND berry in
+ *    sight") to an action score. Learning is reinforcement with eligibility
+ *    traces: acting leaves a fading fingerprint on the weights it used, and
+ *    when endorphin or cortisol arrives seconds later it stamps that
+ *    fingerprint in or out. That delay is why praise and scolding work.
+ *
+ * 2. Word lobe. Each heard word keeps a running average of the situation it was
+ *    heard in - what was in view, what the creature was doing, what it needed.
+ *    That single memory serves both directions: hearing a word pushes attention
+ *    and action, and having a situation lets the creature reach for the word. */
+(function (CG) {
+  'use strict';
+
+  /* What a sprig can perceive things as. */
+  var CATS = ['food', 'drink', 'toy', 'plant', 'weed', 'medicine', 'warmth', 'creature', 'egg', 'hand', 'nest'];
+  var CAT_LABEL = {
+    food: 'berry', drink: 'water', toy: 'ball', plant: 'plant', weed: 'weed', medicine: 'herb',
+    warmth: 'lamp', creature: 'friend', egg: 'egg', hand: 'hand', nest: 'nest'
+  };
+
+  /* What a sprig can do. Order matters: creature.js switches on these. */
+  var ACTIONS = ['rest', 'eat', 'drink', 'play', 'sleep', 'approach', 'retreat', 'wander', 'call', 'push', 'mate'];
+  var ACTION_LABEL = {
+    rest: 'resting', eat: 'eating', drink: 'drinking', play: 'playing', sleep: 'sleeping',
+    approach: 'going to', retreat: 'backing away', wander: 'wandering', call: 'calling out',
+    push: 'pushing', mate: 'courting'
+  };
+  /* The same actions with a target, and as something to be attempting. */
+  var ACTION_AT = {
+    eat: 'eating', drink: 'drinking', play: 'playing with', approach: 'going to',
+    retreat: 'backing away from', push: 'pushing', mate: 'courting'
+  };
+  var ACTION_TRY = {
+    rest: 'settle', eat: 'eat', drink: 'drink', play: 'play with', sleep: 'settle down',
+    approach: 'reach', retreat: 'get away from', wander: 'wander', call: 'call out',
+    push: 'push', mate: 'court'
+  };
+
+  var nD = CG.DRIVES.length, nC = CATS.length, nA = ACTIONS.length;
+  var nConj = nD * nC;
+  var EXTRA = 4;                       /* proximity, held, nothing-in-view, night */
+  var nIn = nD + nC + nConj + EXTRA + 1;   /* + bias */
+  var OFF_D = 0, OFF_C = nD, OFF_X = nD + nC, OFF_E = nD + nC + nConj, OFF_BIAS = nIn - 1;
+
+  var WORD_LEN = nC + nA + nD;         /* a word's meaning lives in three sections */
+  var MAX_WORDS = 40;
+
+  function Brain(compiled, rng) {
+    this.rng = rng;
+    this.W = new Float32Array(nIn * nA);
+    this.elig = new Float32Array(nIn * nA);
+    this.x = new Float32Array(nIn);
+    this.scores = new Float32Array(nA);
+    this.words = {};        /* word -> {w:Float32Array, heard, last} */
+    this.wordCount = 0;
+    this.heard = null;      /* word currently ringing in the ears */
+    this.heardAge = 99;
+    this.lastAction = -1;
+    this.learnRate = 1;
+    this.explore = 0.08;
+    this.traits = compiled.traits;
+    this.installInstincts(compiled.instincts);
+  }
+
+  /* Instincts write directly into the decision weights at birth. They are weak:
+   * a nudge toward the right idea, not a solution. Experience overwrites them. */
+  Brain.prototype.installInstincts = function (instincts) {
+    for (var i = 0; i < instincts.length; i++) {
+      var g = instincts[i];
+      var a = ACTIONS.indexOf(g.action);
+      if (a < 0) continue;
+      var parts = String(g.cue).split('+');
+      var dName = parts[0], cName = parts[1];
+      var d = CG.DRIVES.indexOf(dName), c = CATS.indexOf(cName);
+      var idx = -1;
+      if (d >= 0 && c >= 0) idx = OFF_X + d * nC + c;
+      else if (d >= 0) idx = OFF_D + d;
+      else if (c >= 0) idx = OFF_C + c;
+      else if (cName === 'none') idx = OFF_E + 2;
+      else idx = OFF_BIAS;
+      this.W[idx * nA + a] += g.w;
+    }
+  };
+
+  /* Build the situation vector. Salience is per category (the strongest thing
+   * of that kind in view), so "there is food nearby" is a first class fact. */
+  Brain.prototype.sense = function (drives, catSalience, prox, held, night) {
+    var x = this.x, i, j;
+    for (i = 0; i < nIn; i++) x[i] = 0;
+    for (i = 0; i < nD; i++) x[OFF_D + i] = drives[i];
+    for (i = 0; i < nC; i++) x[OFF_C + i] = catSalience[i];
+
+    /* Hearing a word tilts perception: say "berry" and berries stand out. */
+    if (this.heard && this.words[this.heard] && this.heardAge < 4) {
+      var wm = this.words[this.heard].w, fade = 1 - this.heardAge / 4;
+      for (i = 0; i < nC; i++) x[OFF_C + i] = CG.clamp01(x[OFF_C + i] + wm[i] * 0.6 * fade);
+    }
+
+    for (i = 0; i < nD; i++) {
+      var dv = x[OFF_D + i];
+      if (dv < 0.02) continue;
+      for (j = 0; j < nC; j++) x[OFF_X + i * nC + j] = dv * x[OFF_C + j];
+    }
+    var anything = 0;
+    for (i = 0; i < nC; i++) anything = Math.max(anything, x[OFF_C + i]);
+    x[OFF_E + 0] = prox;
+    x[OFF_E + 1] = held;
+    x[OFF_E + 2] = 1 - anything;
+    x[OFF_E + 3] = night;
+    x[OFF_BIAS] = 1;
+    return x;
+  };
+
+  /* Score every action, add the pull of any word just heard, and sample. */
+  Brain.prototype.decide = function (temperature) {
+    var x = this.x, W = this.W, s = this.scores, i, a, sum;
+    for (a = 0; a < nA; a++) {
+      sum = 0;
+      for (i = 0; i < nIn; i++) { if (x[i] !== 0) sum += x[i] * W[i * nA + a]; }
+      s[a] = sum;
+    }
+    if (this.heard && this.words[this.heard] && this.heardAge < 4) {
+      var wm = this.words[this.heard].w, fade = 1 - this.heardAge / 4;
+      for (a = 0; a < nA; a++) s[a] += wm[nC + a] * 2.2 * fade;
+    }
+
+    /* Scores are divided by the length of the situation vector so that a rich
+     * scene and a bare one are judged on the same scale. */
+    var norm = 0;
+    for (i = 0; i < nIn; i++) norm += x[i] * x[i];
+    norm = CG.clamp(Math.sqrt(norm), 1, 2.2);   /* a busy scene must not drown out a loud need */
+    for (a = 0; a < nA; a++) s[a] /= norm;
+
+    var t = Math.max(0.12, temperature), best = -Infinity;
+    for (a = 0; a < nA; a++) if (s[a] > best) best = s[a];
+    var tot = 0, p = this.p || (this.p = new Float32Array(nA));
+    for (a = 0; a < nA; a++) { p[a] = Math.exp((s[a] - best) / t); tot += p[a]; }
+    /* A floor of curiosity under every action. Without it a confident sprig
+     * becomes a certain one: the policy gradient goes to zero, learning stops,
+     * and it will repeat one mistake until it dies. The floor keeps a little
+     * doubt alive, which is the only thing that lets a habit be unlearned. */
+    var eps = this.explore;
+    for (a = 0; a < nA; a++) p[a] = (1 - eps) * (p[a] / tot) + eps / nA;
+    var r = this.rng.next();
+    for (a = 0; a < nA; a++) { r -= p[a]; if (r <= 0) return a; }
+    return nA - 1;
+  };
+
+  /* Remember that this action was taken in this situation, so a reward arriving
+   * a few seconds later knows which weights to credit.
+   *
+   * The trace is the policy gradient of a softmax: credit for the action taken
+   * is scaled by (1 - its probability), and every rival action is debited by its
+   * own probability. That factor is what stops a habit running away with itself
+   * - once a sprig is already certain, further praise teaches it nothing, and
+   * the pull of the alternatives keeps it able to change its mind. */
+  Brain.prototype.commit = function (action) {
+    var x = this.x, e = this.elig, p = this.p, i, b, xi, base, norm = 0;
+    for (i = 0; i < nIn; i++) norm += x[i] * x[i];
+    norm = 1 / Math.sqrt(Math.max(norm, 1e-6));
+    for (i = 0; i < nIn; i++) {
+      xi = x[i];
+      if (xi === 0) continue;
+      xi *= norm;
+      base = i * nA;
+      for (b = 0; b < nA; b++) {
+        e[base + b] = CG.clamp(e[base + b] + xi * ((b === action ? 1 : 0) - p[b]), -3, 3);
+      }
+    }
+    this.lastAction = action;
+  };
+
+  /* reward > 0 for endorphin, < 0 for cortisol. Called every tick. */
+  Brain.prototype.reinforce = function (reward, dt) {
+    var e = this.elig, W = this.W, n = e.length, i;
+    var decay = Math.exp(-dt / 6);
+    var lr = 0.09 * this.learnRate * (this.traits.learnRate || 1);
+    var forget = 1 - 0.0012 * dt * (this.traits.forgetRate || 1);
+    if (Math.abs(reward) > 1e-4) {
+      var step = lr * reward * dt * 14;
+      for (i = 0; i < n; i++) {
+        if (e[i] !== 0) W[i] = CG.clamp(W[i] + step * e[i], -4, 4);
+      }
+    }
+    for (i = 0; i < n; i++) {
+      e[i] *= decay;
+      if (e[i] !== 0 && e[i] < 1e-4 && e[i] > -1e-4) e[i] = 0;
+      W[i] *= forget;   /* unused ideas fade, which keeps old habits revisable */
+    }
+    if (this.heard) {
+      this.heardAge += dt;
+      if (this.heardAge > 6) this.heard = null;
+    }
+  };
+
+  /* ---------- language ---------- */
+  function ctxVector(brain, catSalience, action, drives) {
+    var v = new Float32Array(WORD_LEN), i, m = 0;
+    for (i = 0; i < nC; i++) { v[i] = catSalience[i]; }
+    if (action >= 0) v[nC + action] = 0.8;
+    for (i = 0; i < nD; i++) v[nC + nA + i] = drives[i] * 0.7;
+    for (i = 0; i < WORD_LEN; i++) m = Math.max(m, v[i]);
+    if (m > 0) for (i = 0; i < WORD_LEN; i++) v[i] /= m;
+    return v;
+  }
+
+  /* Hearing a word: nudge its stored meaning toward the situation it arrived in.
+   * Attention (from pointing, or from a strong drive) makes the lesson stick. */
+  Brain.prototype.hearWord = function (word, catSalience, action, drives, attention) {
+    if (!word) return;
+    var rec = this.words[word];
+    if (!rec) {
+      if (this.wordCount >= MAX_WORDS) this.forgetWeakestWord();
+      rec = this.words[word] = { w: new Float32Array(WORD_LEN), heard: 0, last: 0 };
+      this.wordCount++;
+    }
+    var ctx = ctxVector(this, catSalience, action, drives);
+    var lr = CG.clamp(0.28 * (this.traits.wordMemory || 1) * (0.4 + attention), 0.02, 0.85);
+    for (var i = 0; i < WORD_LEN; i++) rec.w[i] += (ctx[i] - rec.w[i]) * lr;
+    rec.heard++;
+    this.heard = word;
+    this.heardAge = 0;
+  };
+
+  Brain.prototype.forgetWeakestWord = function () {
+    var worst = null, worstScore = Infinity, k;
+    for (k in this.words) {
+      if (!Object.prototype.hasOwnProperty.call(this.words, k)) continue;
+      if (this.words[k].heard < worstScore) { worstScore = this.words[k].heard; worst = k; }
+    }
+    if (worst) { delete this.words[worst]; this.wordCount--; }
+  };
+
+  /* Reaching for a word that fits the moment. Returns null when nothing fits,
+   * which is most of the time early on - and that silence is the point. */
+  Brain.prototype.findWord = function (catSalience, action, drives, threshold) {
+    var ctx = ctxVector(this, catSalience, action, drives);
+    var best = null, bestScore = threshold == null ? 0.42 : threshold, k, i, dot, mag;
+    for (k in this.words) {
+      if (!Object.prototype.hasOwnProperty.call(this.words, k)) continue;
+      var w = this.words[k].w;
+      dot = 0; mag = 0;
+      for (i = 0; i < WORD_LEN; i++) { dot += w[i] * ctx[i]; mag += w[i] * w[i]; }
+      if (mag < 1e-6) continue;
+      var score = dot / Math.sqrt(mag);
+      /* A word heard twice is a guess; heard ten times it is knowledge. */
+      score *= CG.clamp01(this.words[k].heard / 4);
+      if (score > bestScore) { bestScore = score; best = k; }
+    }
+    return best;
+  };
+
+  /* How well does this creature know this word? 0..1, for the UI. */
+  Brain.prototype.wordStrength = function (word) {
+    var rec = this.words[word];
+    if (!rec) return 0;
+    var mag = 0;
+    for (var i = 0; i < WORD_LEN; i++) mag += rec.w[i] * rec.w[i];
+    return CG.clamp01(Math.sqrt(mag) * CG.clamp01(rec.heard / 6));
+  };
+
+  /* What the creature currently believes a word points at, for the science panel. */
+  Brain.prototype.wordMeaning = function (word) {
+    var rec = this.words[word];
+    if (!rec) return null;
+    var best = -1, bi = 0, i;
+    for (i = 0; i < WORD_LEN; i++) if (rec.w[i] > best) { best = rec.w[i]; bi = i; }
+    if (best < 0.15) return null;
+    if (bi < nC) return CAT_LABEL[CATS[bi]];
+    if (bi < nC + nA) return ACTION_LABEL[ACTIONS[bi - nC]];
+    return CG.DRIVE_LABEL[CG.DRIVES[bi - nC - nA]].toLowerCase();
+  };
+
+  Brain.prototype.serialize = function () {
+    var words = {}, k;
+    for (k in this.words) {
+      if (!Object.prototype.hasOwnProperty.call(this.words, k)) continue;
+      words[k] = { w: Array.prototype.slice.call(this.words[k].w), heard: this.words[k].heard };
+    }
+    return { W: Array.prototype.slice.call(this.W), words: words };
+  };
+  Brain.prototype.load = function (data) {
+    if (!data) return;
+    if (data.W && data.W.length === this.W.length) this.W.set(data.W);
+    this.words = {}; this.wordCount = 0;
+    for (var k in data.words) {
+      if (!Object.prototype.hasOwnProperty.call(data.words, k)) continue;
+      var rec = data.words[k];
+      if (!rec.w || rec.w.length !== WORD_LEN) continue;
+      this.words[k] = { w: Float32Array.from(rec.w), heard: rec.heard || 1, last: 0 };
+      this.wordCount++;
+    }
+  };
+
+  CG.CATS = CATS; CG.CAT_LABEL = CAT_LABEL;
+  CG.ACTIONS = ACTIONS; CG.ACTION_LABEL = ACTION_LABEL;
+  CG.ACTION_AT = ACTION_AT; CG.ACTION_TRY = ACTION_TRY;
+  CG.Brain = Brain;
+  CG.BRAIN_DIMS = { nIn: nIn, nA: nA, nC: nC, nD: nD, OFF_D: OFF_D, OFF_C: OFF_C, OFF_X: OFF_X, OFF_E: OFF_E };
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/world.js ===== */
+/* Sprigs - the world.
+ *
+ * One long side-on valley with a cold grotto at the west end and a warm lamp at
+ * the east, so temperature is a place you can walk to rather than a number.
+ * Everything a creature can perceive is an object with a category, which is the
+ * only vocabulary the brain has for the outside. */
+(function (CG) {
+  'use strict';
+
+  var WORLD_W = 1600;
+  var GROUND_Y = 430;
+  var DAY_LENGTH = 420;    /* seconds for a full day/night cycle */
+
+  var KINDS = {
+    bush:   { cat: 'plant',    r: 46, solid: false, label: 'bush', edible: true },
+    berry:  { cat: 'food',     r: 11, solid: false, label: 'berry', edible: true },
+    pool:   { cat: 'drink',    r: 90, solid: false, label: 'pool' },
+    ball:   { cat: 'toy',      r: 16, solid: false, label: 'ball', movable: true },
+    weed:   { cat: 'weed',     r: 18, solid: false, label: 'weed', edible: true },
+    herb:   { cat: 'medicine', r: 15, solid: false, label: 'herb', edible: true },
+    lamp:   { cat: 'warmth',   r: 55, solid: false, label: 'lamp' },
+    nest:   { cat: 'nest',     r: 40, solid: false, label: 'nest' },
+    egg:    { cat: 'egg',      r: 14, solid: false, label: 'egg' }
+  };
+
+  function Obj(kind, x, extra) {
+    this.id = CG.uid('o');
+    this.kind = kind;
+    this.cat = KINDS[kind].cat;
+    this.x = x;
+    this.y = GROUND_Y;
+    this.r = KINDS[kind].r;
+    this.vx = 0;
+    this.held = false;
+    this.age = 0;
+    this.phase = Math.random() * Math.PI * 2;
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) this[k] = extra[k];
+  }
+
+  function World(seed) {
+    this.rng = new CG.RNG(seed || 12345);
+    this.seed = seed || 12345;
+    this.w = WORLD_W;
+    this.groundY = GROUND_Y;
+    this.time = 60;            /* start mid-morning */
+    this.objects = [];
+    this.creatures = [];
+    this.eggs = [];
+    this.events = [];          /* transient things to draw: sounds, hearts, puffs */
+    this.hand = { x: 900, y: 260, down: false, holding: null };
+    this.stats = { born: 0, died: 0, generations: 1 };
+    this.build();
+  }
+
+  World.prototype.build = function () {
+    var r = this.rng, i;
+    /* A valley small enough to cross. Sprigs that live at opposite ends of a
+     * huge map never meet, never breed and are lonely their whole lives, so
+     * everything here is within a couple of minutes' walk. Cold grotto in the
+     * west, warm lamp in the east, food and water through the middle, and the
+     * weeds out past the lamp where you have to go looking for them. */
+    this.add(new Obj('pool', 640));
+    this.add(new Obj('pool', 1240));
+    this.add(new Obj('lamp', 1480));
+    this.add(new Obj('nest', 860));
+    var bushX = [200, 420, 560, 700, 900, 1100, 1320];
+    for (i = 0; i < bushX.length; i++) {
+      this.add(new Obj('bush', bushX[i] + r.range(-18, 18), { berries: 3, regrow: 0 }));
+    }
+    for (i = 0; i < 3; i++) this.add(new Obj('herb', 1360 + i * 55 + r.range(-10, 10), { regrow: 0 }));
+    for (i = 0; i < 3; i++) this.add(new Obj('weed', 1520 + i * 28 + r.range(-8, 8), { regrow: 0 }));
+    this.add(new Obj('ball', 520));
+    this.add(new Obj('ball', 980));
+  };
+
+  World.prototype.add = function (o) { this.objects.push(o); return o; };
+  World.prototype.remove = function (o) {
+    var i = this.objects.indexOf(o);
+    if (i >= 0) this.objects.splice(i, 1);
+    if (this.hand.holding === o) this.hand.holding = null;
+  };
+
+  /* Ambient warmth at a point, 0 (freezing) .. 1 (hot). */
+  World.prototype.temperature = function (x) {
+    var t = 0.5;
+    /* the grotto in the west stays cold */
+    t -= CG.clamp01((240 - x) / 240) * 0.38;
+    /* lamps radiate */
+    for (var i = 0; i < this.objects.length; i++) {
+      var o = this.objects[i];
+      if (o.kind !== 'lamp') continue;
+      var d = Math.abs(o.x - x);
+      if (d < 330) t += (1 - d / 330) * 0.45;
+    }
+    /* nights are cool */
+    t -= this.nightFactor() * 0.08;
+    return CG.clamp01(t);
+  };
+
+  World.prototype.nightFactor = function () {
+    var p = (this.time % DAY_LENGTH) / DAY_LENGTH;   /* 0 = dawn */
+    /* daylight from 0.05 to 0.62, smooth dusk and dawn */
+    var light = CG.clamp01(Math.sin(Math.PI * CG.clamp01((p - 0.02) / 0.66)) * 1.6);
+    if (p > 0.7 || p < 0.02) light = 0;
+    return 1 - CG.clamp01(light);
+  };
+
+  World.prototype.dayCount = function () { return Math.floor(this.time / DAY_LENGTH) + 1; };
+
+  /* Everything perceivable near x, cheapest possible: the world is small. */
+  World.prototype.near = function (x, radius, out) {
+    out = out || [];
+    out.length = 0;
+    var i, o;
+    for (i = 0; i < this.objects.length; i++) {
+      o = this.objects[i];
+      if (Math.abs(o.x - x) <= radius) out.push(o);
+    }
+    for (i = 0; i < this.creatures.length; i++) {
+      o = this.creatures[i];
+      if (o.alive && Math.abs(o.x - x) <= radius) out.push(o);
+    }
+    if (Math.abs(this.hand.x - x) <= radius && this.hand.y > 120) out.push(this.handObj());
+    return out;
+  };
+
+  World.prototype.handObj = function () {
+    if (!this._handObj) this._handObj = { id: 'hand', kind: 'hand', cat: 'hand', r: 20, isHand: true };
+    this._handObj.x = this.hand.x;
+    this._handObj.y = this.hand.y;
+    return this._handObj;
+  };
+
+  World.prototype.spawnEvent = function (type, x, y, extra) {
+    var e = { type: type, x: x, y: y, t: 0, life: 1.2 };
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) e[k] = extra[k];
+    this.events.push(e);
+    if (this.events.length > 80) this.events.shift();
+    return e;
+  };
+
+  World.prototype.layEgg = function (genome, x) {
+    var nest = null, i;
+    for (i = 0; i < this.objects.length; i++) if (this.objects[i].kind === 'nest') nest = this.objects[i];
+    var ex = nest ? nest.x + this.rng.range(-30, 30) : x;
+    var egg = new Obj('egg', ex, { genome: genome, hatch: 55 + this.rng.range(0, 25) });
+    this.add(egg);
+    this.spawnEvent('spark', ex, GROUND_Y - 20);
+    return egg;
+  };
+
+  World.prototype.update = function (dt) {
+    this.time += dt;
+    var i, o;
+
+    for (i = this.objects.length - 1; i >= 0; i--) {
+      o = this.objects[i];
+      o.age += dt;
+
+      if (o.kind === 'bush') {
+        o.regrow -= dt;
+        if (o.regrow <= 0 && o.berries < 4) {
+          o.berries++;
+          o.regrow = 22 + this.rng.range(0, 14);
+        }
+        /* A bush in fruit reads as food; a stripped one is just scenery. This is
+         * the world telling the creature what it is looking at. */
+        o.cat = o.berries > 0 ? 'food' : 'plant';
+      } else if (o.kind === 'ball') {
+        if (!o.held) {
+          o.x += o.vx * dt;
+          o.vx *= Math.pow(0.14, dt);
+          if (Math.abs(o.vx) < 2) o.vx = 0;
+          o.x = CG.clamp(o.x, 20, this.w - 20);
+        }
+      } else if (o.kind === 'berry' && !o.held) {
+        o.life = (o.life == null ? 90 : o.life) - dt;
+        if (o.life <= 0) this.remove(o);
+      } else if (o.kind === 'egg') {
+        o.hatch -= dt;
+        if (o.hatch <= 0) {
+          this.hatch(o);
+        }
+      } else if ((o.kind === 'herb' || o.kind === 'weed') && o.eaten) {
+        o.regrow -= dt;
+        if (o.regrow <= 0) o.eaten = false;
+      }
+    }
+
+    for (i = this.events.length - 1; i >= 0; i--) {
+      this.events[i].t += dt;
+      if (this.events[i].t > this.events[i].life) this.events.splice(i, 1);
+    }
+
+    /* Bushes drop a berry within reach when one is ripe and none is on the ground. */
+    for (i = 0; i < this.objects.length; i++) {
+      o = this.objects[i];
+      if (o.kind !== 'bush' || o.berries <= 0) continue;
+      if (!this.anyNear('berry', o.x, 70)) {
+        o.berries--;
+        this.add(new Obj('berry', o.x + this.rng.range(-50, 50), { life: 120 }));
+      }
+    }
+  };
+
+  World.prototype.anyNear = function (kind, x, r) {
+    for (var i = 0; i < this.objects.length; i++) {
+      var o = this.objects[i];
+      if (o.kind === kind && Math.abs(o.x - x) < r) return true;
+    }
+    return false;
+  };
+
+  World.prototype.hatch = function (egg) {
+    this.remove(egg);
+    var c = new CG.Creature(egg.genome, this.rng.fork(), egg.x, this);
+    if (egg.sex) c.sex = egg.sex;   /* the opening pair is deliberately a pair */
+    this.creatures.push(c);
+    this.stats.born++;
+    this.stats.generations = Math.max(this.stats.generations, egg.genome.gen || 1);
+    this.spawnEvent('spark', egg.x, GROUND_Y - 30);
+    this.log(c.name + ' hatched!');
+    return c;
+  };
+
+  World.prototype.log = function (msg) {
+    if (!this.journal) this.journal = [];
+    this.journal.push({ t: this.time, msg: msg });
+    if (this.journal.length > 200) this.journal.shift();
+    if (this.onLog) this.onLog(msg);
+  };
+
+  World.prototype.living = function () {
+    return this.creatures.filter(function (c) { return c.alive; });
+  };
+
+  /* ---------- saving ---------- */
+  World.prototype.toJSON = function () {
+    return {
+      v: 1, seed: this.seed, time: this.time, stats: this.stats,
+      journal: (this.journal || []).slice(-40),
+      objects: this.objects.map(function (o) {
+        return { kind: o.kind, x: o.x, berries: o.berries, eaten: o.eaten,
+          regrow: o.regrow, hatch: o.hatch, life: o.life, vx: o.vx, genome: o.genome, sex: o.sex };
+      }),
+      creatures: this.creatures.map(function (c) { return c.toJSON(); })
+    };
+  };
+
+  World.load = function (data) {
+    var w = new World(data.seed);
+    w.objects.length = 0;
+    w.time = data.time || 0;
+    if (data.stats) w.stats = data.stats;
+    w.journal = data.journal || [];
+    data.objects.forEach(function (o) {
+      var obj = new Obj(o.kind, o.x, {});
+      obj.berries = o.berries; obj.eaten = o.eaten; obj.regrow = o.regrow;
+      obj.hatch = o.hatch; obj.life = o.life; obj.vx = o.vx || 0;
+      if (o.genome) obj.genome = o.genome;
+      if (o.sex) obj.sex = o.sex;
+      if (o.kind === 'bush') obj.cat = obj.berries > 0 ? 'food' : 'plant';
+      w.objects.push(obj);
+    });
+    data.creatures.forEach(function (c) { w.creatures.push(CG.Creature.fromJSON(c, w)); });
+    return w;
+  };
+
+  CG.World = World;
+  CG.WorldObj = Obj;
+  CG.KINDS = KINDS;
+  CG.DAY_LENGTH = DAY_LENGTH;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/creature.js ===== */
+/* Sprigs - the creature.
+ *
+ * Order of business each tick:
+ *   look -> body conditions -> emitters -> chemistry -> receptors -> drives
+ *   -> how much better or worse life just got -> learn -> choose -> act
+ *
+ * Nothing here reaches around the biochemistry. If you want a sprig to feel
+ * hungry you have to raise a chemical, and if you want it to act on hunger a
+ * receptor has to read that chemical back out. */
+(function (CG) {
+  'use strict';
+
+  var CI = CG.CI, nD = CG.DRIVES.length, nC = CG.CATS.length;
+  var A = {};
+  for (var ai = 0; ai < CG.ACTIONS.length; ai++) A[CG.ACTIONS[ai]] = ai;
+
+  var STAGES = [
+    { name: 'baby',       until: 0.06, size: 0.45, tempCurve: 1.4, learn: 1.5 },
+    { name: 'child',      until: 0.17, size: 0.62, tempCurve: 1.2, learn: 1.35 },
+    { name: 'adolescent', until: 0.29, size: 0.82, tempCurve: 1.2, learn: 1.1 },
+    { name: 'adult',      until: 0.72, size: 1.00, tempCurve: 1.0, learn: 1.0 },
+    { name: 'elder',      until: 1.10, size: 0.96, tempCurve: 0.9, learn: 0.7 }
+  ];
+
+  /* How badly each drive hurts, used to turn drive changes into feelings. */
+  var DRIVE_WEIGHT = { hunger: 1.0, thirst: 1.0, fatigue: 0.8, lonely: 0.7, bored: 0.6,
+    cold: 0.8, hot: 0.8, pain: 1.2, fear: 1.0, sexdrive: 0.5, sick: 1.0 };
+  var DW = CG.DRIVES.map(function (d) { return DRIVE_WEIGHT[d] || 1; });
+
+  /* Which category tends to answer which need. A newborn's attention is drawn
+   * this way; what it then *does* about it is entirely learned. */
+  var RELEVANCE = {
+    hunger: 'food', thirst: 'drink', bored: 'toy', sick: 'medicine',
+    lonely: 'creature', cold: 'warmth', sexdrive: 'creature', fatigue: 'nest'
+  };
+
+  function Creature(genome, rng, x, world) {
+    this.id = CG.uid('c');
+    this.genome = genome;
+    this.C = CG.genome.compile(genome);
+    this.rng = rng;
+    this.world = world;
+    this.name = CG.makeName(rng);
+    this.sex = rng.chance(0.5) ? 'f' : 'm';
+    this.cat = 'creature';   /* how everyone else perceives this thing */
+    this.kind = 'creature';
+
+    this.soup = new CG.Soup();
+    /* Hatchlings carry a yolk: enough of everything to be clumsy for a while. */
+    this.soup.set('glucose', 0.85); this.soup.set('water', 0.85);
+    this.soup.set('starch', 0.5); this.soup.set('protein', 0.5);
+    this.soup.set('fat', 0.4);
+    this.soup.set('growth', 0.4);
+
+    this.brain = new CG.Brain(this.C, rng.fork());
+
+    this.x = x; this.y = world.groundY; this.vx = 0; this.facing = 1;
+    this.age = 0; this.alive = true; this.cause = null;
+    this.health = 1; this.stageIdx = 0; this.stage = STAGES[0].name;
+    this.size = STAGES[0].size;
+
+    this.drives = new Float32Array(nD);
+    this.prevDrives = new Float32Array(nD);
+    this.cats = new Float32Array(nC);
+    this.params = { speed: 1, learnRate: 1, metabolism: 1, boldness: 1, growth: 1, focus: 1 };
+
+    this.focus = null; this.focusDist = 999;
+    this.action = A.rest; this.actionTime = 0; this.actionDur = 1;
+    this.actionOk = true;
+    this.asleep = false; this.awakeTime = 0;
+    this.stimulation = 0.6; this.social = 0.5;
+    this.scolded = 0; this.tickled = 0;
+    this.gravid = 0; this.pendingGenome = null; this.mateCooldown = 20;
+    this.rewardBase = 0; this.lastReward = 0;
+    this.speech = null; this.speechT = 0;
+    this.bob = rng.range(0, 6.28);
+    this.held = false;
+    this.nearby = [];
+    this.lifespan = this.C.traits.lifespan;
+    this.eyeTarget = 0;
+    this.driveMean = new Float32Array(nD);
+    this.driveNews = new Float32Array(nD);
+    this.stats = { eaten: 0, drunk: 0, played: 0, slept: 0, words: 0, children: 0, scolds: 0, tickles: 0 };
+    this.lastActionName = 'rest';
+    this.actionCount = new Float32Array(CG.ACTIONS.length);
+    if (this.C.lethal) { this.health = 0.25; this.frail = this.C.lethal; }
+  }
+
+  /* ---------- perception ---------- */
+  /* Salience is refreshed every tick, but the thing being *attended to* is
+   * sticky. Without that a sprig re-picks a target sixty times a second and
+   * spends its life vibrating between two berries. Attention shifts when the
+   * current target is gone, when a decision is due, or when something much more
+   * interesting turns up. */
+  Creature.prototype.look = function (allowShift) {
+    var range = 430 + 150 * (this.C.traits.curiosity - 1);
+    var list = this.world.near(this.x, range * 1.7, this.nearby);
+    var i, o, d, prox, ci, best = null, bestScore = 0, focusValid = false;
+    for (i = 0; i < nC; i++) this.cats[i] = 0;
+
+    for (i = 0; i < list.length; i++) {
+      o = list[i];
+      if (o === this) continue;
+      if (o.eaten || (o.alive === false)) continue;
+      d = Math.abs(o.x - this.x);
+      /* A moving animal catches the eye from much further off than a bush. */
+      var reach = (o.cat === 'creature' || o.cat === 'hand') ? range * 1.7 : range;
+      if (d > reach) continue;
+      prox = CG.clamp01(1 - d / reach);
+      ci = CG.CATS.indexOf(o.cat);
+      if (ci < 0) continue;
+      if (prox > this.cats[ci]) this.cats[ci] = prox;
+      if (o === this.focus) focusValid = true;
+
+      /* Near things win; things that answer a loud need win more; and a word
+       * just spoken by the player tilts the whole competition. */
+      var rel = 0;
+      for (var k = 0; k < nD; k++) {
+        if (RELEVANCE[CG.DRIVES[k]] === o.cat) rel = Math.max(rel, this.drives[k]);
+      }
+      var score = prox * (0.5 + rel * 1.1) * (0.85 + 0.3 * this.rng.next() * this.C.traits.curiosity);
+      if (this.brain.heard && this.brain.heardAge < 3) {
+        var wm = this.brain.words[this.brain.heard];
+        if (wm) score *= 1 + wm.w[ci] * 1.8;
+      }
+      if (o === this.focus) score *= 1.9;    /* stickiness */
+      if (score > bestScore) { bestScore = score; best = o; }
+    }
+
+    if (!focusValid) this.focus = null;
+    if (allowShift || !this.focus) this.focus = best;
+    this.focusDist = this.focus ? Math.abs(this.focus.x - this.x) : 999;
+    return list;
+  };
+
+  /* ---------- body ---------- */
+  Creature.prototype.bodyConditions = function (dt) {
+    var s = this.soup, w = this.world;
+    var temp = w.temperature(this.x);
+    var pref = this.C.traits.tempPref;
+    var crowd = 0;
+    for (var i = 0; i < this.nearby.length; i++) {
+      var o = this.nearby[i];
+      if (o !== this && o.alive && Math.abs(o.x - this.x) < 90) crowd++;
+    }
+    this.crowd = crowd;
+    if (crowd > 0) this.social = CG.clamp01(this.social + dt * 0.16 * this.C.traits.sociability);
+    else this.social = CG.clamp01(this.social - dt * 0.006);
+
+    /* Going somewhere is mildly interesting in itself, which keeps a healthy
+     * sprig off the floor of boredom without anything having to happen. */
+    this.stimulation = CG.clamp01(this.stimulation - dt * 0.008 + Math.abs(this.vx) * dt * 0.00035);
+    this.awakeTime += this.asleep ? -dt * 3 : dt;
+    if (this.awakeTime < 0) this.awakeTime = 0;
+    this.scolded = Math.max(0, this.scolded - dt * 0.5);
+    this.tickled = Math.max(0, this.tickled - dt * 0.5);
+
+    var stageC = STAGES[this.stageIdx];
+    return {
+      lowGlucose: 1 - s.get('glucose'),
+      lowWater: 1 - s.get('water'),
+      awake: CG.clamp01(this.awakeTime / 260),
+      alone: 1 - this.social,
+      unstimulated: 1 - this.stimulation,
+      threat: CG.clamp01(this.scolded * 0.8 + (w.nightFactor() > 0.6 && crowd === 0 ? 0.18 : 0)),
+      injury: 1 - this.health,
+      chilly: CG.clamp01((pref - temp) * 1.6 * stageC.tempCurve),
+      sweaty: CG.clamp01((temp - pref) * 1.6 * stageC.tempCurve),
+      mature: CG.clamp01(this.age / (this.lifespan * 0.3)),
+      exertion: CG.clamp01(Math.abs(this.vx) / 60),
+      night: w.nightFactor(),
+      sickLoad: s.get('sickness'),
+      toxLoad: s.get('toxin'),
+      crowded: CG.clamp01(crowd / 3)
+    };
+  };
+
+  Creature.prototype.metabolise = function (dt) {
+    var s = this.soup, C = this.C;
+    var rate = C.traits.metabolism * this.params.metabolism * (0.55 + 0.9 * CG.clamp01(Math.abs(this.vx) / 60));
+    if (this.asleep) rate *= 0.45;
+    /* Small bodies burn faster per unit of body, as small bodies do. */
+    rate *= (1.25 - 0.35 * this.size);
+    s.add('glucose', -0.0026 * rate * dt);
+    s.add('water', -0.0013 * rate * dt);
+    if (this.stageIdx < 3) s.add('protein', -0.0008 * dt);
+
+    /* Emitters, chemistry, then read the soup back out as drives. */
+    var cond = this.bodyConditions(dt);
+    var em = C.emitters, i, g, v;
+    for (i = 0; i < em.length; i++) {
+      g = em[i];
+      v = cond[g.src];
+      if (v == null) continue;
+      if (g.invert) v = 1 - v;
+      if (v > g.thresh) s.addIdx(g.chem, (v - g.thresh) * g.gain * dt);
+    }
+
+    s.step(dt, C.reactions, C.halfLife);
+
+    var acc = this._acc || (this._acc = {});
+    var k;
+    for (k in this.params) if (Object.prototype.hasOwnProperty.call(this.params, k)) acc[k] = 0;
+    for (i = 0; i < nD; i++) { this.prevDrives[i] = this.drives[i]; this.drives[i] = 0; }
+
+    var rc = C.receptors;
+    for (i = 0; i < rc.length; i++) {
+      g = rc[i];
+      v = s.c[g.chem];
+      if (g.invert) v = 1 - v;
+      if (v <= g.thresh) continue;
+      var contrib = (v - g.thresh) * g.gain;
+      if (g.tgt.charCodeAt(0) === 100) {           /* 'drive:' */
+        var di = CG.DRIVES.indexOf(g.tgt.slice(6));
+        if (di >= 0) this.drives[di] += contrib;
+      } else {
+        var pk = g.tgt.slice(6);
+        if (acc[pk] != null) acc[pk] += contrib;
+      }
+    }
+    for (i = 0; i < nD; i++) this.drives[i] = CG.clamp01(this.drives[i]);
+    for (k in acc) if (Object.prototype.hasOwnProperty.call(acc, k)) this.params[k] = CG.clamp(1 + acc[k], 0.15, 3);
+
+    this.temp = cond.chilly > cond.sweaty ? -cond.chilly : cond.sweaty;
+  };
+
+  Creature.prototype.healthTick = function (dt) {
+    var s = this.soup, dmg = 0;
+    if (s.get('glucose') < 0.05) dmg += 0.009 * (0.05 - s.get('glucose')) / 0.05;
+    if (s.get('water') < 0.05) dmg += 0.011 * (0.05 - s.get('water')) / 0.05;
+    if (s.get('sickness') > 0.5) dmg += (s.get('sickness') - 0.5) * 0.011 / Math.max(0.3, this.C.traits.immunity);
+    var over = this.age - this.lifespan;
+    if (over > 0) dmg += 0.004 + over / this.lifespan * 0.03;
+    dmg += Math.max(0, Math.abs(this.temp || 0) - 0.75) * 0.02;
+
+    if (dmg > 0) this.health -= dmg * dt;
+    else if (this.drives[0] < 0.3 && this.drives[1] < 0.3 && s.get('sickness') < 0.15) {
+      this.health = Math.min(1, this.health + 0.008 * dt);
+    }
+
+    if (this.health <= 0 && this.alive) this.die(this.deathCause());
+  };
+
+  Creature.prototype.deathCause = function () {
+    var s = this.soup;
+    if (this.age > this.lifespan) return 'old age';
+    if (s.get('water') < 0.05) return 'thirst';
+    if (s.get('glucose') < 0.05) return 'hunger';
+    if (s.get('sickness') > 0.4) return 'illness';
+    if (this.frail) return 'a fault in its genes';
+    return 'poor health';
+  };
+
+  Creature.prototype.die = function (cause) {
+    this.alive = false;
+    this.cause = cause;
+    this.health = 0;
+    this.world.stats.died++;
+    this.world.spawnEvent('puff', this.x, this.y - 20);
+    this.world.log(this.name + ' died of ' + cause + ', aged ' + CG.fmtAge(this.age) + '.');
+  };
+
+  /* ---------- feelings ---------- */
+  /* Life getting better is the reward. Everything else - praise, a full belly,
+   * a friend arriving - reaches the brain through this one number. */
+  Creature.prototype.feel = function (dt) {
+    var better = 0, worse = 0, i, d;
+    for (i = 0; i < nD; i++) {
+      d = this.prevDrives[i] - this.drives[i];
+      if (d > 0) better += d * DW[i]; else worse += -d * DW[i];
+    }
+    var s = this.soup;
+    s.add('reward', better * 2.2);
+    s.add('punish', worse * 0.85);
+
+    /* Change alone is not enough to live by. A sprig whose hunger has been
+     * pinned at maximum for a minute gets no signal from change - it has
+     * nowhere left to rise - and would happily sit still and starve.
+     *
+     * The fix is not to punish it harder; that would punish eating just as
+     * much as resting, since both happen while starving. What being in a bad
+     * way actually does is make a creature restless: the worse things are, the
+     * more willing it is to abandon whatever it is doing and try something
+     * else. So misery is fed to exploration, not to the reward. */
+    var worst = 0, mean = 0, totw = 0;
+    for (i = 0; i < nD; i++) {
+      var lvl = this.drives[i] * this.drives[i] * DW[i];
+      if (lvl > worst) worst = lvl;
+      mean += lvl; totw += DW[i];
+    }
+    this.misery = CG.clamp01(worst * 0.7 + (mean / totw) * 0.3);
+
+    var net = s.get('endorphin') - s.get('cortisol');
+    /* Compare against a slow baseline so a permanently happy sprig still has
+     * something left to learn from. */
+    this.rewardBase += (net - this.rewardBase) * (1 - Math.exp(-dt / 90));
+    var signal = net - this.rewardBase * 0.6;
+    this.lastReward = signal;
+
+    /* What a word refers to should be whatever stands out right now. A sprig
+     * that has been lonely for an hour is not talking about loneliness, so
+     * drives are reported to the language lobe as departures from their own
+     * long run average rather than as raw levels. */
+    var relax = 1 - Math.exp(-dt / 120);
+    for (i = 0; i < nD; i++) {
+      this.driveMean[i] += (this.drives[i] - this.driveMean[i]) * relax;
+      this.driveNews[i] = CG.clamp01((this.drives[i] - this.driveMean[i]) * 1.6);
+    }
+
+    this.brain.learnRate = STAGES[this.stageIdx].learn * this.params.learnRate;
+    this.brain.explore = CG.clamp(
+      (0.13 * this.C.traits.curiosity) / (1 + this.stageIdx * 0.55) + this.misery * 0.42,
+      0.05, 0.5);
+    this.brain.reinforce(signal, dt);
+  };
+
+  /* ---------- acting ---------- */
+  Creature.prototype.reach = function () { return 30 + 26 * this.size; };
+
+  Creature.prototype.chooseAction = function () {
+    var b = this.brain;
+    /* A fresh decision gets a fresh look at the world. */
+    this.look(true);
+    var prox = this.focus ? CG.clamp01(1 - this.focusDist / 430) : 0;
+    b.sense(this.drives, this.cats, prox, this.held ? 1 : 0, this.world.nightFactor());
+    /* Young and bored sprigs try random things; focused adults commit. */
+    var t = 0.32 * this.C.traits.curiosity * this.params.focus
+      * (this.stageIdx === 0 ? 1.25 : this.stageIdx === 1 ? 1.12 : 1)
+      * (1 + this.drives[CG.DRIVES.indexOf('bored')] * 0.5)
+      * (1 + (this.misery || 0) * 0.8);
+    var a = b.decide(t);
+    b.commit(a);
+    this.retarget(a);
+    this.action = a;
+    this.lastActionName = CG.ACTIONS[a];
+    this.actionCount[a]++;
+    this.actionTime = 0;
+    this.actionDur = this.durationFor(a);
+    this.actionOk = true;
+    this.startAction(a);
+  };
+
+  /* Having decided to eat, look for something edible. Attention picks what is
+   * interesting; intention then picks what is useful. Without this a sprig
+   * spends its life trying to eat a ball it happens to be looking at.
+   * It still has to learn *when* to eat - only the aiming is innate. */
+  var WANTS = {};
+  WANTS[A.eat] = ['food', 'medicine', 'weed'];
+  WANTS[A.drink] = ['drink'];
+  WANTS[A.play] = ['toy', 'creature'];
+  WANTS[A.push] = ['toy'];
+  WANTS[A.mate] = ['creature'];
+
+  Creature.prototype.retarget = function (a) {
+    var want = WANTS[a];
+    if (!want) return;
+    if (this.focus && want.indexOf(this.focus.cat) >= 0) return;
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < this.nearby.length; i++) {
+      var o = this.nearby[i];
+      if (o === this || o.eaten || o.alive === false) continue;
+      if (want.indexOf(o.cat) < 0) continue;
+      var d = Math.abs(o.x - this.x);
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    if (best) { this.focus = best; this.focusDist = bestD; }
+  };
+
+  Creature.prototype.durationFor = function (a) {
+    switch (a) {
+      case A.sleep: return 24;
+      case A.rest: return 2.2;
+      case A.eat: case A.drink: return 2.4;
+      case A.play: return 3.2;
+      case A.approach: case A.retreat: return 2.6;
+      case A.wander: return 2.6 * this.C.traits.patience;
+      case A.call: return 1.4;
+      case A.mate: return 2.6;
+      default: return 1.6;
+    }
+  };
+
+  Creature.prototype.startAction = function (a) {
+    if (a === A.wander) this.wanderDir = this.rng.chance(0.5) ? -1 : 1;
+    if (a === A.sleep) {
+      /* Lying down wide awake achieves nothing and the body says so. */
+      if (this.soup.get('sleepiness') < 0.12) { this.frustrate(0.02); this.asleep = false; }
+      else { this.asleep = true; this.stats.slept++; }
+    } else this.asleep = false;
+    if (a === A.call) this.callOut();
+  };
+
+  /* End the current action early - but never sooner than MIN_ACT, or a sprig
+   * whose action fails on contact will re-decide every single tick and hammer
+   * its own weights flat. */
+  var MIN_ACT = 0.5;
+  Creature.prototype.endAction = function () {
+    this.actionDur = Math.max(this.actionTime, MIN_ACT);
+  };
+  Creature.prototype.frustrate = function (amount) {
+    /* An action that cannot work keeps failing on every tick until its minimum
+     * time is up. Charge for the disappointment once, not five times over. */
+    if (!this.actionOk) { this.endAction(); return; }
+    this.soup.add('punish', amount);
+    this.actionOk = false;
+    this.endAction();
+  };
+
+  Creature.prototype.act = function (dt) {
+    var f = this.focus, s = this.soup, w = this.world;
+    var speed = 52 * this.params.speed * (0.55 + 0.45 * this.size) * (this.C.traits.stamina || 1);
+    var inReach = f && this.focusDist <= this.reach() + (f.r || 12);
+    this.vx = 0;
+
+    switch (this.action) {
+      case A.rest:
+        s.add('wakeful', 0.02 * dt);
+        break;
+
+      case A.sleep:
+        s.add('sleepiness', -0.09 * dt);
+        s.add('fatiguesig', -0.12 * dt);
+        s.add('wakeful', 0.03 * dt);
+        if (s.get('sleepiness') < 0.04 || this.drives[0] > 0.85 || this.drives[1] > 0.85) {
+          this.asleep = false; this.endAction();
+        }
+        break;
+
+      case A.eat:
+        if (!f || !this.edible(f)) { this.frustrate(0.03); break; }
+        if (!inReach) { this.frustrate(0.008); break; }   /* right idea, too far */
+        this.consume(f);
+        this.endAction();
+        break;
+
+      case A.drink:
+        if (!f || f.cat !== 'drink') { this.frustrate(0.03); break; }
+        if (!inReach) { this.frustrate(0.008); break; }
+        s.add('water', 0.30 * dt);
+        this.stats.drunk += dt;
+        if (this.drives[1] > 0.2) s.add('reward', 0.12 * dt);
+        w.spawnEvent('drop', this.x, this.y - 14 * this.size);
+        break;
+
+      case A.play:
+        if (!f || (f.cat !== 'toy' && f.cat !== 'creature')) { this.frustrate(0.03); break; }
+        if (!inReach) { this.frustrate(0.008); break; }
+        var boredom = this.drives[CG.DRIVES.indexOf('bored')];
+        s.add('boredsig', -0.22 * dt);
+        s.add('reward', 0.22 * boredom * dt);   /* fun is only fun when you were bored */
+        s.add('curiosity', -0.1 * dt);
+        this.stimulation = CG.clamp01(this.stimulation + 0.32 * dt);
+        this.stats.played += dt;
+        if (f.kind === 'ball') f.vx += (f.x > this.x ? 1 : -1) * 55 * dt;
+        if (f.cat === 'creature' && f.alive) {
+          f.stimulation = CG.clamp01(f.stimulation + 0.22 * dt);
+          f.soup.add('boredsig', -0.12 * dt);
+          f.social = CG.clamp01(f.social + 0.2 * dt);
+        }
+        if (this.rng.chance(dt * 1.2)) w.spawnEvent('note', this.x, this.y - 40 * this.size);
+        break;
+
+      case A.approach:
+        if (!f) { this.frustrate(0.015); break; }
+        /* Already there. Walking to something you are standing on is a habit
+         * worth losing, so it stings very slightly. */
+        /* Already there. Walking to something you are standing on is a habit
+         * worth losing, so it stings slightly - and attention moves on. */
+        if (inReach) { this.frustrate(0.02); this.look(true); break; }
+        this.vx = (f.x > this.x ? 1 : -1) * speed;
+        break;
+
+      case A.retreat:
+        if (!f) { this.frustrate(0.015); break; }
+        this.vx = (f.x > this.x ? -1 : 1) * speed * 1.1;
+        break;
+
+      case A.wander:
+        this.vx = this.wanderDir * speed * 0.7;
+        if (this.x < 40) this.wanderDir = 1;
+        if (this.x > w.w - 40) this.wanderDir = -1;
+        break;
+
+      case A.call:
+        break;   /* the shout happens once, at action start */
+
+      case A.push:
+        if (!f || !inReach || !CG.KINDS[f.kind] || !CG.KINDS[f.kind].movable) { this.frustrate(0.02); break; }
+        f.vx += (f.x > this.x ? 1 : -1) * 170 * dt;
+        this.stimulation = CG.clamp01(this.stimulation + 0.12 * dt);
+        break;
+
+      case A.mate:
+        if (!f || f.cat !== 'creature' || !inReach) { this.frustrate(0.02); break; }
+        this.tryMate(f);
+        this.endAction();
+        break;
+
+    }
+
+    if (this.vx !== 0) this.facing = this.vx > 0 ? 1 : -1;
+    this.x = CG.clamp(this.x + this.vx * dt, 24, w.w - 24);
+  };
+
+  Creature.prototype.edible = function (o) {
+    return !!(CG.KINDS[o.kind] && CG.KINDS[o.kind].edible && !o.eaten);
+  };
+
+  Creature.prototype.consume = function (o) {
+    var s = this.soup, hungry = this.drives[0];
+    if (o.kind === 'bush') {
+      if (o.berries <= 0) { this.frustrate(0.02); return; }
+      o.berries--;
+      o.cat = o.berries > 0 ? 'food' : 'plant';
+      o.regrow = Math.max(o.regrow, 14);
+      s.add('starch', 0.30); s.add('water', 0.14); s.add('protein', 0.12);
+    } else if (o.kind === 'berry') {
+      s.add('starch', 0.34); s.add('water', 0.16); s.add('protein', 0.14);
+      this.world.remove(o);
+    } else if (o.kind === 'herb') {
+      s.add('antitoxin', 0.55); s.add('antibody', 0.5); s.add('starch', 0.05);
+      o.eaten = true; o.regrow = 70;
+    } else if (o.kind === 'weed') {
+      s.add('starch', 0.16); s.add('toxin', 0.55);
+      o.eaten = true; o.regrow = 55;
+    } else { this.frustrate(0.02); return; }
+    /* Taste is its own small reward, and it arrives instantly. The real lesson
+     * comes minutes later when the toxin - or the full belly - is felt. */
+    s.add('reward', 0.05 + hungry * 0.55);
+    this.stats.eaten++;
+    this.stimulation = CG.clamp01(this.stimulation + 0.12);
+    this.world.spawnEvent('crumb', o.x, o.y - 10);
+    if (this.focus === o) this.focus = null;
+  };
+
+  Creature.prototype.callOut = function () {
+    var word = this.brain.findWord(this.cats, this.action, this.driveNews, 0.38);
+    this.say(word || '...');
+    this.world.spawnEvent('call', this.x, this.y - 46 * this.size);
+    var list = this.world.near(this.x, 380);
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (o === this || !o.alive) continue;
+      /* Hearing a voice is a comfort, but only a small one. If shouting were
+       * as good as company, two lonely sprigs would call across the valley
+       * forever and never actually walk over to each other. */
+      o.social = CG.clamp01(o.social + 0.07);
+      o.soup.add('lonelysig', -0.05);
+      o.soup.add('curiosity', 0.12);
+      /* A shout turns heads. This is how two sprigs in a big valley ever find
+       * each other, and it is why a lonely one calls in the first place. */
+      if (o.drives[CG.DRIVES.indexOf('lonely')] > 0.3 || o.rng.chance(0.4)) {
+        o.focus = this; o.focusDist = Math.abs(this.x - o.x);
+      }
+      if (word) o.hear(word, 0.35);
+    }
+    this.social = CG.clamp01(this.social + 0.05);
+    this.soup.add('lonelysig', -0.04);
+  };
+
+  Creature.prototype.say = function (word) {
+    this.speech = word;
+    this.speechT = 2.6;
+  };
+
+  Creature.prototype.hear = function (word, attention) {
+    if (!this.alive || this.asleep) return;
+    var known = this.brain.words[word];
+    this.brain.hearWord(word, this.cats, this.action, this.driveNews, attention == null ? 0.6 : attention);
+    if (!known) this.stats.words++;
+    /* Being spoken to is mildly nice; it is also how a sprig learns that words
+     * are worth attending to at all. */
+    this.soup.add('curiosity', 0.08);
+  };
+
+  Creature.prototype.tryMate = function (other) {
+    if (!other.alive || other.sex === this.sex) { this.frustrate(0.02); return; }
+    if (this.stageIdx < 3 || other.stageIdx < 3) { this.frustrate(0.02); return; }
+    if (this.mateCooldown > 0 || other.mateCooldown > 0) { this.frustrate(0.02); return; }
+    var willing = this.drives[CG.DRIVES.indexOf('sexdrive')] > 0.22 &&
+      other.drives[CG.DRIVES.indexOf('sexdrive')] > 0.15;
+    if (!willing) { this.frustrate(0.02); return; }
+
+    var mum = this.sex === 'f' ? this : other;
+    var dad = this.sex === 'f' ? other : this;
+    if (mum.gravid > 0) { this.frustrate(0.01); return; }
+    mum.pendingGenome = CG.genome.crossover(mum.genome, dad.genome, this.rng);
+    mum.gravid = 26;
+    this.mateCooldown = other.mateCooldown = 90;
+    this.soup.add('reward', 0.6); other.soup.add('reward', 0.6);
+    this.soup.add('sexdrive', -0.9); other.soup.add('sexdrive', -0.9);
+    this.soup.add('affection', 0.5); other.soup.add('affection', 0.5);
+    this.stats.children++; other.stats.children++;
+    this.world.spawnEvent('heart', (this.x + other.x) / 2, this.y - 50);
+    this.world.log(mum.name + ' and ' + dad.name + ' are expecting.');
+  };
+
+  /* ---------- player touch ---------- */
+  Creature.prototype.tickle = function () {
+    this.soup.add('reward', 0.55);
+    this.soup.add('affection', 0.35);
+    this.tickled = 1;
+    this.stimulation = CG.clamp01(this.stimulation + 0.25);
+    this.social = CG.clamp01(this.social + 0.3);
+    this.asleep = false;
+    this.stats.tickles++;
+    this.world.spawnEvent('heart', this.x, this.y - 48 * this.size);
+  };
+  Creature.prototype.scold = function () {
+    this.soup.add('punish', 0.55);
+    this.soup.add('fearsig', 0.2);
+    this.scolded = 1;
+    this.asleep = false;
+    this.stats.scolds++;
+    this.world.spawnEvent('bolt', this.x, this.y - 48 * this.size);
+  };
+
+  /* ---------- main tick ---------- */
+  Creature.prototype.update = function (dt) {
+    if (!this.alive) return;
+    this.age += dt;
+    this.bob += dt * (2.4 + Math.abs(this.vx) * 0.05);
+    if (this.speechT > 0) { this.speechT -= dt; if (this.speechT <= 0) this.speech = null; }
+    if (this.mateCooldown > 0) this.mateCooldown -= dt;
+
+    /* life stage */
+    var frac = this.age / this.lifespan, si = 0;
+    while (si < STAGES.length - 1 && frac > STAGES[si].until) si++;
+    if (si !== this.stageIdx) {
+      this.stageIdx = si; this.stage = STAGES[si].name;
+      this.world.log(this.name + ' is now ' + (si === 4 ? 'an ' : 'a ') + this.stage + '.');
+    }
+    var targetSize = STAGES[si].size * this.C.traits.bodySize * CG.clamp(0.6 + this.soup.get('growth'), 0.6, 1.15);
+    this.size += (targetSize - this.size) * CG.clamp01(dt * 0.4);
+
+    this.look(false);
+    this.metabolise(dt);
+    this.healthTick(dt);
+    if (!this.alive) return;
+    this.feel(dt);
+
+    if (this.gravid > 0) {
+      this.gravid -= dt;
+      if (this.gravid <= 0 && this.pendingGenome) {
+        this.world.layEgg(this.pendingGenome, this.x);
+        this.world.log(this.name + ' laid an egg.');
+        this.pendingGenome = null;
+        this.soup.add('reward', 0.4);
+      }
+    }
+
+    if (this.held) { this.vx = 0; return; }
+
+    this.actionTime += dt;
+    if (this.asleep) {
+      this.act(dt);
+      if (!this.asleep) this.endAction();
+    } else {
+      if (this.actionTime >= Math.max(MIN_ACT, this.actionDur)) this.chooseAction();
+      this.act(dt);
+    }
+
+    /* Once in a while, say the word that fits. This is the whole point of
+     * teaching, and it is how you find out what a sprig has understood. */
+    if (!this.speech && !this.asleep && this.rng.chance(dt * 0.16 * this.C.traits.sociability)) {
+      var w = this.brain.findWord(this.cats, this.action, this.driveNews, 0.5);
+      if (w) this.say(w);
+    }
+  };
+
+  /* ---------- readouts ---------- */
+  Creature.prototype.topDrive = function () {
+    var bi = -1, bv = 0.18;
+    for (var i = 0; i < nD; i++) if (this.drives[i] > bv) { bv = this.drives[i]; bi = i; }
+    return bi;
+  };
+
+  Creature.prototype.moodFace = function () {
+    var net = this.soup.get('endorphin') - this.soup.get('cortisol');
+    if (!this.alive) return 'x_x';
+    if (this.asleep) return 'zzz';
+    if (net > 0.18) return ':D';
+    if (net < -0.18) return ':(';
+    if (this.topDrive() >= 0) return ':|';
+    return ':)';
+  };
+
+  /* One plain sentence describing what is going on inside. */
+  Creature.prototype.describeState = function () {
+    if (!this.alive) return this.name + ' has died of ' + this.cause + '.';
+    if (this.asleep) return this.name + ' is fast asleep.';
+    var d = this.topDrive();
+    var need = d >= 0 ? CG.DRIVE_LABEL[CG.DRIVES[d]].toLowerCase() : 'content';
+    var name = CG.ACTIONS[this.action];
+    var directed = !!CG.ACTION_AT[name];
+    var target = (directed && this.focus) ? this.focus : null;
+    var at = '';
+    if (target) {
+      /* A friend has a name; everything else takes an article. */
+      at = ' ' + (target.cat === 'creature'
+        ? target.name
+        : 'the ' + (CG.KINDS[target.kind] ? CG.KINDS[target.kind].label : target.kind));
+    }
+    var doing;
+    if (!this.actionOk) doing = 'trying to ' + CG.ACTION_TRY[name];
+    else doing = (target ? CG.ACTION_AT[name] : CG.ACTION_LABEL[name]);
+    return this.name + ' is ' + need + ' and ' + doing + at + '.';
+  };
+
+  Creature.prototype.toJSON = function () {
+    return {
+      id: this.id, name: this.name, sex: this.sex, genome: this.genome, age: this.age,
+      x: this.x, health: this.health, alive: this.alive, cause: this.cause,
+      soup: Array.prototype.slice.call(this.soup.c), brain: this.brain.serialize(),
+      stats: this.stats, social: this.social, stimulation: this.stimulation,
+      awakeTime: this.awakeTime, gravid: this.gravid, pendingGenome: this.pendingGenome,
+      mateCooldown: this.mateCooldown, seed: this.rng.s
+    };
+  };
+
+  Creature.fromJSON = function (data, world) {
+    var c = new Creature(data.genome, new CG.RNG(data.seed || 1), data.x, world);
+    c.id = data.id; c.name = data.name; c.sex = data.sex; c.age = data.age;
+    c.health = data.health; c.alive = data.alive; c.cause = data.cause;
+    if (data.soup) c.soup.c.set(data.soup);
+    c.brain.load(data.brain);
+    if (data.stats) c.stats = data.stats;
+    c.social = data.social; c.stimulation = data.stimulation;
+    c.awakeTime = data.awakeTime || 0; c.gravid = data.gravid || 0;
+    c.pendingGenome = data.pendingGenome || null;
+    c.mateCooldown = data.mateCooldown || 0;
+    return c;
+  };
+
+  CG.Creature = Creature;
+  CG.STAGES = STAGES;
+  CG.ACT = A;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/render.js ===== */
+/* Sprigs - drawing.
+ *
+ * Nothing here is an image file. Every sprig is drawn from its own genes, so
+ * two siblings look like siblings and a mutation is something you can see
+ * across the valley without opening a panel. */
+(function (CG) {
+  'use strict';
+
+  function Renderer(canvas, world) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.world = world;
+    this.camX = 600;
+    this.dpr = 1;
+    this.zoom = 1.4;    /* the valley is drawn a little larger than life */
+    this.w = 800; this.h = 480;
+    this.vw = 800; this.vh = 480;
+    this.resize();
+  }
+
+  Renderer.prototype.resize = function () {
+    var c = this.canvas, rect = c.getBoundingClientRect();
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.w = Math.max(320, Math.round(rect.width));
+    this.h = Math.max(240, Math.round(rect.height));
+    c.width = Math.round(this.w * this.dpr);
+    c.height = Math.round(this.h * this.dpr);
+    /* Drawing happens in "view" units, which are zoom times larger than screen
+     * pixels. Everything below works in those units and never sees the zoom. */
+    this.zoom = CG.clamp(Math.min(this.w / 520, this.h / 330), 1.2, 2.4);
+    this.vw = this.w / this.zoom;
+    this.vh = this.h / this.zoom;
+    this.ctx.setTransform(this.dpr * this.zoom, 0, 0, this.dpr * this.zoom, 0, 0);
+  };
+
+  Renderer.prototype.follow = function (target, dt, snap) {
+    if (!target) return;
+    var want = CG.clamp(target.x, this.vw / 2, Math.max(this.vw / 2, this.world.w - this.vw / 2));
+    if (snap) this.camX = want;
+    else this.camX += (want - this.camX) * CG.clamp01(dt * 2.4);
+  };
+
+  /* px is a real screen pixel; view units are what the drawing code uses. */
+  Renderer.prototype.toWorld = function (px) { return px / this.zoom + this.camX - this.vw / 2; };
+  Renderer.prototype.toScreen = function (wx) { return wx - this.camX + this.vw / 2; };
+  Renderer.prototype.screenToViewY = function (py) { return py / this.zoom; };
+
+  /* ---------- sky ---------- */
+  function skyColours(night) {
+    /* day -> dusk -> night, interpolated in plain rgb */
+    var day = [[152, 205, 235], [206, 232, 244]];
+    var dusk = [[92, 96, 152], [232, 148, 122]];
+    var nite = [[14, 18, 44], [38, 44, 84]];
+    var a, b, t;
+    if (night < 0.5) { a = day; b = dusk; t = night / 0.5; }
+    else { a = dusk; b = nite; t = (night - 0.5) / 0.5; }
+    function mix(i) {
+      return 'rgb(' + Math.round(CG.lerp(a[i][0], b[i][0], t)) + ',' +
+        Math.round(CG.lerp(a[i][1], b[i][1], t)) + ',' +
+        Math.round(CG.lerp(a[i][2], b[i][2], t)) + ')';
+    }
+    return [mix(0), mix(1)];
+  }
+
+  Renderer.prototype.drawSky = function () {
+    var ctx = this.ctx, w = this.vw, h = this.vh, world = this.world;
+    var night = world.nightFactor();
+    var cols = skyColours(night);
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, cols[0]);
+    g.addColorStop(1, cols[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    if (night > 0.35) {
+      ctx.save();
+      ctx.globalAlpha = (night - 0.35) / 0.65;
+      ctx.fillStyle = '#fff';
+      for (var i = 0; i < 60; i++) {
+        var sx = ((i * 977) % 1600) - this.camX * 0.15;
+        sx = ((sx % 1600) + 1600) % 1600;
+        var sy = (i * 613) % Math.max(1, Math.round(h * 0.55));
+        var tw = 0.5 + 0.5 * Math.sin(world.time * 1.4 + i);
+        ctx.globalAlpha = ((night - 0.35) / 0.65) * (0.35 + 0.5 * tw);
+        ctx.fillRect(sx, sy, 1.6, 1.6);
+      }
+      ctx.restore();
+    }
+
+    /* sun and moon ride the same arc, half a day apart */
+    var p = (world.time % CG.DAY_LENGTH) / CG.DAY_LENGTH;
+    this.drawOrb(p, '#ffe9a8', 20, 1 - night);
+    this.drawOrb((p + 0.5) % 1, '#e8eef8', 14, night);
+  };
+
+  Renderer.prototype.drawOrb = function (p, colour, r, alpha) {
+    if (alpha <= 0.02) return;
+    var ctx = this.ctx;
+    var x = this.vw * (p * 1.6 - 0.15);
+    var y = this.vh * 0.62 - Math.sin(p * Math.PI * 1.15) * this.vh * 0.5;
+    ctx.save();
+    ctx.globalAlpha = CG.clamp01(alpha);
+    ctx.fillStyle = colour;
+    ctx.shadowColor = colour; ctx.shadowBlur = 26;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  };
+
+  Renderer.prototype.drawHills = function () {
+    var ctx = this.ctx, h = this.vh, w = this.vw, world = this.world;
+    var night = world.nightFactor();
+    var gy = this.groundScreenY();
+    var layers = [
+      { par: 0.25, amp: 34, base: gy - 58, col: 'rgba(96,132,104,' + (0.55 - night * 0.25) + ')', step: 190 },
+      { par: 0.45, amp: 26, base: gy - 26, col: 'rgba(74,112,86,' + (0.7 - night * 0.3) + ')', step: 140 }
+    ];
+    for (var l = 0; l < layers.length; l++) {
+      var L = layers[l];
+      ctx.fillStyle = L.col;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (var x = -20; x <= w + 20; x += 8) {
+        var wx = (x + this.camX * L.par) / L.step;
+        var y = L.base - Math.sin(wx) * L.amp - Math.sin(wx * 2.3) * L.amp * 0.35;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath(); ctx.fill();
+    }
+  };
+
+  Renderer.prototype.groundScreenY = function () {
+    return Math.round(this.vh * 0.74);
+  };
+
+  Renderer.prototype.drawGround = function () {
+    var ctx = this.ctx, w = this.vw, h = this.vh;
+    var gy = this.groundScreenY(), night = this.world.nightFactor();
+    var g = ctx.createLinearGradient(0, gy - 10, 0, h);
+    g.addColorStop(0, 'rgb(' + Math.round(112 - night * 60) + ',' + Math.round(158 - night * 88) + ',' + Math.round(88 - night * 46) + ')');
+    g.addColorStop(1, 'rgb(' + Math.round(64 - night * 34) + ',' + Math.round(92 - night * 50) + ',' + Math.round(56 - night * 30) + ')');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, gy, w, h - gy);
+
+    /* the cold grotto in the west reads as a blue chill on the ground */
+    var gx = this.toScreen(0), gw = this.toScreen(240) - gx;
+    if (gw > 0 && gx < w) {
+      var cg = ctx.createLinearGradient(gx, 0, gx + gw, 0);
+      cg.addColorStop(0, 'rgba(150,205,255,0.34)');
+      cg.addColorStop(1, 'rgba(150,205,255,0)');
+      ctx.fillStyle = cg;
+      ctx.fillRect(gx, gy - 90, gw, h - gy + 90);
+    }
+
+    /* grass tufts, deterministic so they do not crawl about */
+    ctx.strokeStyle = 'rgba(40,78,44,' + (0.5 - night * 0.25) + ')';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    var start = Math.floor((this.camX - w / 2) / 26) * 26;
+    for (var wx = start; wx < this.camX + w / 2 + 26; wx += 26) {
+      var sx = this.toScreen(wx);
+      var lean = ((wx * 37) % 11) / 11 - 0.5;
+      ctx.moveTo(sx, gy + 4);
+      ctx.lineTo(sx + lean * 7, gy - 8 - ((wx * 17) % 7));
+    }
+    ctx.stroke();
+  };
+
+  /* ---------- objects ---------- */
+  Renderer.prototype.drawObject = function (o) {
+    var ctx = this.ctx, x = this.toScreen(o.x), gy = this.groundScreenY();
+    if (x < -80 || x > this.vw + 80) return;
+    var night = this.world.nightFactor(), dim = 1 - night * 0.45;
+    ctx.save();
+
+    switch (o.kind) {
+      case 'bush': {
+        var sway = Math.sin(this.world.time * 0.8 + o.phase) * 2;
+        ctx.fillStyle = 'rgb(' + Math.round(52 * dim) + ',' + Math.round(94 * dim) + ',' + Math.round(56 * dim) + ')';
+        ctx.beginPath();
+        ctx.ellipse(x + sway, gy - 26, 40, 30, 0, 0, 6.2832); ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x - 20 + sway, gy - 14, 24, 20, 0, 0, 6.2832); ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + 22 + sway, gy - 16, 22, 19, 0, 0, 6.2832); ctx.fill();
+        for (var b = 0; b < o.berries; b++) {
+          var bx = x + sway + Math.cos(b * 2.1 + o.phase) * 26;
+          var by = gy - 26 + Math.sin(b * 2.7 + o.phase) * 16;
+          ctx.fillStyle = 'rgb(' + Math.round(214 * dim) + ',' + Math.round(66 * dim) + ',' + Math.round(96 * dim) + ')';
+          ctx.beginPath(); ctx.arc(bx, by, 5, 0, 6.2832); ctx.fill();
+        }
+        break;
+      }
+      case 'berry':
+        ctx.fillStyle = 'rgb(' + Math.round(220 * dim) + ',' + Math.round(70 * dim) + ',' + Math.round(100 * dim) + ')';
+        ctx.beginPath(); ctx.arc(x, gy - 6, 6, 0, 6.2832); ctx.fill();
+        ctx.strokeStyle = 'rgba(40,90,40,' + dim + ')'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x, gy - 11); ctx.lineTo(x + 3, gy - 16); ctx.stroke();
+        break;
+      case 'pool': {
+        var pg = ctx.createLinearGradient(0, gy - 12, 0, gy + 16);
+        pg.addColorStop(0, 'rgba(' + Math.round(120 * dim) + ',' + Math.round(196 * dim) + ',' + Math.round(232 * dim) + ',0.95)');
+        pg.addColorStop(1, 'rgba(' + Math.round(46 * dim) + ',' + Math.round(110 * dim) + ',' + Math.round(160 * dim) + ',0.95)');
+        ctx.fillStyle = pg;
+        ctx.beginPath(); ctx.ellipse(x, gy + 4, o.r, 15, 0, 0, 6.2832); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.4;
+        for (var i = 0; i < 3; i++) {
+          var ry = gy + 1 + i * 4;
+          var ph = Math.sin(this.world.time * 1.6 + i * 1.7 + o.phase) * 6;
+          ctx.beginPath();
+          ctx.ellipse(x + ph, ry, o.r * (0.62 - i * 0.16), 3.5 - i, 0, 0, 3.1416);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'ball': {
+        var roll = o.x * 0.06;
+        ctx.save();
+        ctx.translate(x, gy - 14); ctx.rotate(roll);
+        ctx.fillStyle = 'rgb(' + Math.round(238 * dim) + ',' + Math.round(190 * dim) + ',' + Math.round(72 * dim) + ')';
+        ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.2832); ctx.fill();
+        ctx.strokeStyle = 'rgba(180,90,40,' + dim + ')'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(14, 0); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.2832); ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case 'weed':
+        if (o.eaten) { ctx.restore(); return; }
+        ctx.strokeStyle = 'rgb(' + Math.round(108 * dim) + ',' + Math.round(76 * dim) + ',' + Math.round(140 * dim) + ')';
+        ctx.lineWidth = 3;
+        for (var s = -1; s <= 1; s++) {
+          ctx.beginPath();
+          ctx.moveTo(x + s * 5, gy);
+          ctx.quadraticCurveTo(x + s * 14, gy - 16, x + s * 7, gy - 30);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgb(' + Math.round(160 * dim) + ',' + Math.round(96 * dim) + ',' + Math.round(190 * dim) + ')';
+        ctx.beginPath(); ctx.arc(x, gy - 32, 6, 0, 6.2832); ctx.fill();
+        break;
+      case 'herb':
+        if (o.eaten) { ctx.restore(); return; }
+        ctx.strokeStyle = 'rgb(' + Math.round(84 * dim) + ',' + Math.round(168 * dim) + ',' + Math.round(120 * dim) + ')';
+        ctx.lineWidth = 2.4;
+        for (var k = -1; k <= 1; k++) {
+          ctx.beginPath();
+          ctx.moveTo(x, gy);
+          ctx.quadraticCurveTo(x + k * 12, gy - 14, x + k * 9, gy - 26);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.85 * dim) + ')';
+        ctx.beginPath(); ctx.arc(x, gy - 27, 4.5, 0, 6.2832); ctx.fill();
+        break;
+      case 'lamp': {
+        var glow = ctx.createRadialGradient(x, gy - 60, 8, x, gy - 60, 130);
+        glow.addColorStop(0, 'rgba(255,214,138,' + (0.5 + night * 0.35) + ')');
+        glow.addColorStop(1, 'rgba(255,214,138,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 140, gy - 190, 280, 210);
+        ctx.strokeStyle = '#6b5540'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy - 52); ctx.stroke();
+        ctx.fillStyle = '#ffd98a';
+        ctx.beginPath(); ctx.arc(x, gy - 62, 15, 0, 6.2832); ctx.fill();
+        ctx.strokeStyle = '#8a6a48'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, gy - 62, 15, 0, 6.2832); ctx.stroke();
+        break;
+      }
+      case 'nest':
+        ctx.fillStyle = 'rgb(' + Math.round(146 * dim) + ',' + Math.round(112 * dim) + ',' + Math.round(66 * dim) + ')';
+        ctx.beginPath(); ctx.ellipse(x, gy - 2, 42, 13, 0, Math.PI, 0, true); ctx.fill();
+        ctx.strokeStyle = 'rgba(96,70,40,' + dim + ')'; ctx.lineWidth = 2;
+        for (var t = -3; t <= 3; t++) {
+          ctx.beginPath();
+          ctx.moveTo(x + t * 11, gy - 1);
+          ctx.lineTo(x + t * 13, gy - 12);
+          ctx.stroke();
+        }
+        break;
+      case 'egg': {
+        var wob = Math.sin(this.world.time * 3 + o.phase) * (o.hatch < 12 ? 3 : 0.6);
+        ctx.save();
+        ctx.translate(x, gy - 12); ctx.rotate(wob * 0.05);
+        ctx.fillStyle = 'rgb(' + Math.round(246 * dim) + ',' + Math.round(238 * dim) + ',' + Math.round(214 * dim) + ')';
+        ctx.beginPath(); ctx.ellipse(0, 0, 11, 15, 0, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = 'rgba(190,170,140,' + dim + ')';
+        for (var d = 0; d < 5; d++) {
+          ctx.beginPath();
+          ctx.arc(Math.cos(d * 2.4) * 6, Math.sin(d * 1.9) * 8, 1.8, 0, 6.2832);
+          ctx.fill();
+        }
+        ctx.restore();
+        break;
+      }
+    }
+    ctx.restore();
+  };
+
+  /* ---------- creatures ---------- */
+  function hsl(h, s, l, a) {
+    return 'hsla(' + (((h % 360) + 360) % 360).toFixed(0) + ',' + (s * 100).toFixed(0) + '%,' +
+      (l * 100).toFixed(0) + '%,' + (a == null ? 1 : a) + ')';
+  }
+
+  Renderer.prototype.drawCreature = function (c, selected) {
+    var ctx = this.ctx, T = c.C.traits;
+    var x = this.toScreen(c.x), gy = this.groundScreenY();
+    if (x < -120 || x > this.vw + 120) return;
+    var night = this.world.nightFactor(), dim = 1 - night * 0.35;
+
+    var S = 26 * c.size;                       /* body radius unit */
+    var walk = Math.abs(c.vx) > 4 ? Math.sin(c.bob * 2.2) : 0;
+    var breathe = Math.sin(c.bob * 0.7) * 0.03;
+    var lift = c.asleep ? 0 : Math.abs(walk) * 3;
+    var bodyY = gy - S * (0.95 + breathe) * T.legLen - lift;
+    var face = c.facing;
+
+    if (!c.alive) { this.drawGhost(c, x, gy, S); return; }
+
+    ctx.save();
+    ctx.translate(x, 0);
+
+    /* shadow */
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.22 * dim) + ')';
+    ctx.beginPath();
+    ctx.ellipse(0, gy + 2, S * 0.85, S * 0.2, 0, 0, 6.2832); ctx.fill();
+
+    var hue = T.hue, hue2 = T.hue2, sat = T.sat, light = T.light * dim;
+    /* illness and poor health drain the colour out of a sprig */
+    var ill = CG.clamp01(c.soup.get('sickness') * 0.8 + (1 - c.health) * 0.6);
+    sat = sat * (1 - ill * 0.65);
+    light = light * (1 - ill * 0.18);
+
+    /* legs */
+    ctx.strokeStyle = hsl(hue, sat, light * 0.7);
+    ctx.lineWidth = Math.max(2.5, S * 0.16);
+    ctx.lineCap = 'round';
+    for (var l = 0; l < 2; l++) {
+      var ph = walk * (l === 0 ? 1 : -1);
+      var lx = (l === 0 ? -1 : 1) * S * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(lx, bodyY + S * 0.55);
+      ctx.lineTo(lx + ph * S * 0.3, gy - 1);
+      ctx.stroke();
+    }
+
+    /* tail */
+    if (T.tailLen > 0.15) {
+      ctx.strokeStyle = hsl(hue, sat, light * 0.85);
+      ctx.lineWidth = Math.max(2, S * 0.13);
+      ctx.beginPath();
+      ctx.moveTo(-face * S * 0.6, bodyY + S * 0.1);
+      ctx.quadraticCurveTo(
+        -face * S * (0.6 + T.tailLen * 0.7), bodyY - S * 0.1 + Math.sin(c.bob * 1.6) * S * 0.2,
+        -face * S * (0.5 + T.tailLen * 1.1), bodyY - S * (0.35 + T.tailLen * 0.3));
+      ctx.stroke();
+    }
+
+    /* body */
+    var bodyGrad = ctx.createLinearGradient(0, bodyY - S, 0, bodyY + S);
+    bodyGrad.addColorStop(0, hsl(hue, sat, Math.min(0.92, light + 0.14)));
+    bodyGrad.addColorStop(1, hsl(hue, sat, light * 0.78));
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, bodyY, S * 0.72 * T.bodySize, S * 0.66 * T.bodySize, 0, 0, 6.2832);
+    ctx.fill();
+
+    /* markings */
+    var pat = Math.floor(T.pattern);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, bodyY, S * 0.72 * T.bodySize, S * 0.66 * T.bodySize, 0, 0, 6.2832);
+    ctx.clip();
+    ctx.fillStyle = hsl(hue2, sat * 0.9, light * 0.82, 0.75);
+    if (pat === 1) {
+      for (var sp = 0; sp < 5; sp++) {
+        var a = sp * 1.9 + 0.4;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * S * 0.4, bodyY + Math.sin(a) * S * 0.34, S * 0.15 * (0.6 + T.spots), 0, 6.2832);
+        ctx.fill();
+      }
+    } else if (pat === 2) {
+      for (var st = -2; st <= 2; st++) {
+        ctx.fillRect(st * S * 0.28 - S * 0.06, bodyY - S, S * 0.12 * (0.5 + T.spots), S * 2);
+      }
+    } else if (pat === 3) {
+      ctx.beginPath();
+      ctx.ellipse(0, bodyY + S * 0.35, S * 0.6, S * 0.3, 0, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    /* head */
+    var headY = bodyY - S * 0.6 * T.headSize;
+    var headX = face * S * 0.22;
+    var HS = S * 0.5 * T.headSize;
+    ctx.fillStyle = hsl(hue, sat, Math.min(0.94, light + 0.08));
+    ctx.beginPath();
+    ctx.ellipse(headX, headY, HS, HS * 0.92, 0, 0, 6.2832);
+    ctx.fill();
+
+    /* ears */
+    ctx.fillStyle = hsl(hue, sat * 0.95, light * 0.9);
+    for (var e = 0; e < 2; e++) {
+      var ex = headX + (e === 0 ? -1 : 1) * HS * 0.55;
+      var droop = c.asleep ? 0.5 : (c.drives[CG.DRIVES.indexOf('fear')] > 0.4 ? 0.7 : 0);
+      ctx.save();
+      ctx.translate(ex, headY - HS * 0.55);
+      ctx.rotate((e === 0 ? -0.35 : 0.35) + droop * (e === 0 ? -0.7 : 0.7) + Math.sin(c.bob) * 0.05);
+      ctx.beginPath();
+      ctx.ellipse(0, -HS * 0.5 * T.earLen, HS * 0.24, HS * 0.62 * T.earLen, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* snout */
+    ctx.fillStyle = hsl(hue, sat * 0.8, Math.min(0.95, light + 0.16));
+    ctx.beginPath();
+    ctx.ellipse(headX + face * HS * 0.6 * T.snout, headY + HS * 0.28, HS * 0.34 * T.snout, HS * 0.26, 0, 0, 6.2832);
+    ctx.fill();
+
+    /* eyes - they follow whatever the sprig is attending to */
+    var lookX = 0;
+    if (c.focus) lookX = CG.clamp((c.focus.x - c.x) / 120, -1, 1);
+    var ES = HS * 0.26 * T.eyeSize;
+    for (var i2 = 0; i2 < 2; i2++) {
+      var eox = headX + (i2 === 0 ? -0.34 : 0.34) * HS + face * HS * 0.16;
+      var eoy = headY - HS * 0.1;
+      if (c.asleep) {
+        ctx.strokeStyle = 'rgba(30,30,40,0.8)';
+        ctx.lineWidth = Math.max(1.5, ES * 0.4);
+        ctx.beginPath();
+        ctx.arc(eox, eoy, ES, 0.15, Math.PI - 0.15);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(eox, eoy, ES, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = '#1b2030';
+        ctx.beginPath();
+        ctx.arc(eox + lookX * ES * 0.42, eoy + ES * 0.1, ES * 0.52, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+
+    /* mouth follows mood */
+    var net = c.soup.get('endorphin') - c.soup.get('cortisol');
+    ctx.strokeStyle = 'rgba(30,30,40,0.75)';
+    ctx.lineWidth = Math.max(1.4, HS * 0.09);
+    ctx.beginPath();
+    var mx = headX + face * HS * 0.5 * T.snout, my = headY + HS * 0.45;
+    if (c.asleep) { ctx.moveTo(mx - HS * 0.1, my); ctx.lineTo(mx + HS * 0.1, my); }
+    else ctx.arc(mx, my - (net < -0.05 ? -HS * 0.3 : HS * 0.16), HS * 0.26,
+      net < -0.05 ? Math.PI : 0.15, net < -0.05 ? 6.2832 : Math.PI - 0.15);
+    ctx.stroke();
+
+    /* pregnancy */
+    if (c.gravid > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(-face * S * 0.15, bodyY + S * 0.2, S * 0.3, S * 0.26, 0, 0, 6.2832);
+      ctx.stroke();
+    }
+
+    if (selected) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.lineDashOffset = -this.world.time * 14;
+      ctx.beginPath();
+      ctx.ellipse(0, gy + 2, S * 0.95, S * 0.28, 0, 0, 6.2832);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+
+    if (c.asleep) this.drawZzz(x + face * S * 0.6, bodyY - S * 1.2, c.bob);
+    if (c.speech) this.drawSpeech(x, bodyY - S * 1.5, c.speech, c.speechT);
+  };
+
+  Renderer.prototype.drawGhost = function (c, x, gy, S) {
+    var ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = 0.32;
+    ctx.fillStyle = '#dfe6ef';
+    ctx.beginPath();
+    ctx.ellipse(x, gy - S * 0.5, S * 0.6, S * 0.5, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.fillStyle = '#2b3245';
+    ctx.font = 'bold ' + Math.round(S * 0.4) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('x  x', x, gy - S * 0.45);
+    ctx.restore();
+  };
+
+  Renderer.prototype.drawZzz = function (x, y, phase) {
+    var ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = '13px system-ui, sans-serif';
+    for (var i = 0; i < 3; i++) {
+      var t = (phase * 0.3 + i * 0.33) % 1;
+      ctx.globalAlpha = 0.8 * (1 - t);
+      ctx.fillText('z', x + t * 14, y - t * 26);
+    }
+    ctx.restore();
+  };
+
+  Renderer.prototype.drawSpeech = function (x, y, text, life) {
+    var ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = CG.clamp01(life / 0.6);
+    ctx.font = '600 13px system-ui, sans-serif';
+    var w = ctx.measureText(text).width + 18;
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
+    roundRect(ctx, x - w / 2, y - 26, w, 22, 11);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 1, y + 2); ctx.lineTo(x + 5, y - 5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#20263a';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x, y - 10);
+    ctx.restore();
+  };
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* ---------- transient feedback ---------- */
+  var EVENT_GLYPH = { heart: '♥', note: '♪', spark: '✦', bolt: '!', call: '≈', drop: '·', crumb: '·', puff: '○' };
+  var EVENT_COLOUR = { heart: '#ff7b9c', note: '#ffe28a', spark: '#fff2a8', bolt: '#ff9a6a', call: '#cfe6ff', drop: '#a9dcf5', crumb: '#f0c88a', puff: '#e8e8ee' };
+
+  Renderer.prototype.drawEvents = function () {
+    var ctx = this.ctx, gy = this.groundScreenY();
+    for (var i = 0; i < this.world.events.length; i++) {
+      var e = this.world.events[i];
+      var t = e.t / e.life;
+      var x = this.toScreen(e.x);
+      if (x < -40 || x > this.vw + 40) continue;
+      var y = (e.y != null ? gy - (this.world.groundY - e.y) : gy) - t * 34;
+      ctx.save();
+      ctx.globalAlpha = CG.clamp01(1 - t);
+      ctx.fillStyle = EVENT_COLOUR[e.type] || '#fff';
+      ctx.font = 'bold ' + (e.type === 'heart' ? 20 : 16) + 'px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(EVENT_GLYPH[e.type] || '*', x + Math.sin(t * 6) * 5, y);
+      ctx.restore();
+    }
+  };
+
+  Renderer.prototype.drawHand = function () {
+    var h = this.world.hand, ctx = this.ctx;
+    if (h.x == null || !h.active) return;
+    var x = this.toScreen(h.x), gy = this.groundScreenY();
+    var y = gy - (this.world.groundY - h.y);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(255,244,232,0.96)';
+    ctx.strokeStyle = 'rgba(60,50,44,0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 13, 16, -0.2, 0, 6.2832);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(-9, -10, 4.5, 8, -0.7, 0, 6.2832);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  };
+
+  Renderer.prototype.render = function (selected) {
+    var w = this.world, i;
+    this.drawSky();
+    this.drawHills();
+    this.drawGround();
+
+    var objs = w.objects.slice().sort(function (a, b) { return a.r - b.r; });
+    for (i = 0; i < objs.length; i++) this.drawObject(objs[i]);
+    for (i = 0; i < w.creatures.length; i++) this.drawCreature(w.creatures[i], w.creatures[i] === selected);
+    this.drawEvents();
+    this.drawHand();
+  };
+
+  /* A face for the roster and the status card, drawn from the same genes. */
+  function drawPortrait(ctx, c, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    var T = c.C.traits, S = Math.min(w, h) * 0.46;
+    var cx = w / 2, cy = h * 0.56;
+    var ill = CG.clamp01(c.soup.get('sickness') * 0.8 + (1 - c.health) * 0.6);
+    var sat = T.sat * (1 - ill * 0.65), light = T.light;
+
+    var bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(255,255,255,0.06)');
+    bg.addColorStop(1, 'rgba(0,0,0,0.16)');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    if (!c.alive) ctx.globalAlpha = 0.4;
+
+    /* ears */
+    ctx.fillStyle = hsl(T.hue, sat, light * 0.9);
+    for (var e = 0; e < 2; e++) {
+      ctx.save();
+      ctx.translate(cx + (e ? 1 : -1) * S * 0.55, cy - S * 0.55);
+      ctx.rotate((e ? 0.35 : -0.35));
+      ctx.beginPath();
+      ctx.ellipse(0, -S * 0.5 * T.earLen, S * 0.24, S * 0.62 * T.earLen, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+    /* head */
+    ctx.fillStyle = hsl(T.hue, sat, Math.min(0.94, light + 0.08));
+    ctx.beginPath(); ctx.ellipse(cx, cy, S, S * 0.92, 0, 0, 6.2832); ctx.fill();
+    /* markings */
+    if (Math.floor(T.pattern) === 1) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(cx, cy, S, S * 0.92, 0, 0, 6.2832); ctx.clip();
+      ctx.fillStyle = hsl(T.hue2, sat * 0.9, light * 0.8, 0.7);
+      for (var d = 0; d < 3; d++) {
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(d * 2.2) * S * 0.45, cy + Math.sin(d * 2.2) * S * 0.4, S * 0.2, 0, 6.2832);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    /* snout */
+    ctx.fillStyle = hsl(T.hue, sat * 0.8, Math.min(0.95, light + 0.16));
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + S * 0.34, S * 0.36 * T.snout, S * 0.26, 0, 0, 6.2832);
+    ctx.fill();
+    /* eyes */
+    var ES = S * 0.24 * T.eyeSize;
+    for (var i = 0; i < 2; i++) {
+      var ex = cx + (i ? 0.35 : -0.35) * S;
+      if (c.asleep || !c.alive) {
+        ctx.strokeStyle = 'rgba(20,22,32,.85)'; ctx.lineWidth = Math.max(1.5, ES * 0.4);
+        ctx.beginPath(); ctx.arc(ex, cy - S * 0.1, ES, 0.15, Math.PI - 0.15); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(ex, cy - S * 0.1, ES, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = '#1b2030';
+        ctx.beginPath(); ctx.arc(ex, cy - S * 0.06, ES * 0.55, 0, 6.2832); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  CG.drawPortrait = drawPortrait;
+  CG.Renderer = Renderer;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/ui.js ===== */
+/* Sprigs - the panel of glass between you and the simulation.
+ *
+ * The rule this file tries to keep: the surface stays as simple as a pet game,
+ * and everything complicated is available but folded away behind "Inside". */
+(function (CG) {
+  'use strict';
+
+  var SAVE_KEY = 'sprigs.save.v1';
+
+  /* Words you can say. Nouns match what a sprig can perceive; verbs match what
+   * it can do; feelings match what it can want. Nothing else is teachable,
+   * because nothing else exists inside its head. */
+  var VOCAB = {
+    things: ['berry', 'water', 'ball', 'plant', 'weed', 'herb', 'lamp', 'friend', 'egg', 'hand', 'nest'],
+    doings: ['eat', 'drink', 'play', 'sleep', 'come', 'go', 'push', 'rest', 'call', 'love'],
+    feelings: ['hungry', 'thirsty', 'tired', 'lonely', 'bored', 'cold', 'hurt', 'ill', 'good', 'no']
+  };
+
+  function el(id) { return document.getElementById(id); }
+
+  function UI(game) {
+    this.game = game;
+    this.tool = 'point';
+    this.selected = null;
+    this.sciTab = 'chem';
+    this.lastHud = 0;
+    this.toastT = 0;
+    this.journal = [];
+    this.build();
+  }
+
+  UI.prototype.build = function () {
+    var self = this, i;
+
+    /* speed */
+    Array.prototype.forEach.call(document.querySelectorAll('.speed button'), function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.speed button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        self.game.speed = Number(b.dataset.speed);
+      });
+    });
+
+    /* tools */
+    Array.prototype.forEach.call(document.querySelectorAll('.tools button'), function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.tools button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        self.tool = b.dataset.tool;
+      });
+    });
+
+    el('btnScience').addEventListener('click', function () {
+      var s = el('science');
+      s.hidden = !s.hidden;
+      el('btnScience').classList.toggle('on', !s.hidden);
+      if (!s.hidden) self.renderScience();
+    });
+    el('btnCloseSci').addEventListener('click', function () {
+      el('science').hidden = true;
+      el('btnScience').classList.remove('on');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.tabs button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        self.sciTab = b.dataset.tab;
+        self.renderScience();
+      });
+    });
+
+    el('btnHelp').addEventListener('click', function () { el('help').hidden = false; });
+    el('btnCloseHelp').addEventListener('click', function () {
+      el('help').hidden = true;
+      try { localStorage.setItem('sprigs.seenHelp', '1'); } catch (e) { /* private mode */ }
+    });
+    el('btnEgg').addEventListener('click', function () { self.game.addEgg(); });
+    el('btnReset').addEventListener('click', function () {
+      if (!window.confirm('Start again? This valley and everyone in it will be gone.')) return;
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* private mode */ }
+      window.location.reload();
+    });
+
+    /* words */
+    var wrap = el('words');
+    ['things', 'doings', 'feelings'].forEach(function (group, gi) {
+      if (gi) { var sep = document.createElement('div'); sep.className = 'grp'; wrap.appendChild(sep); }
+      VOCAB[group].forEach(function (w) {
+        var b = document.createElement('button');
+        b.textContent = w;
+        b.dataset.word = w;
+        b.addEventListener('click', function () { self.say(w); });
+        wrap.appendChild(b);
+      });
+    });
+
+    this.bindCanvas();
+    window.addEventListener('keydown', function (e) {
+      if (e.key === ' ') { e.preventDefault(); self.togglePause(); }
+      var map = { '1': 'point', '2': 'carry', '3': 'tickle', '4': 'scold' };
+      if (map[e.key]) {
+        document.querySelectorAll('.tools button').forEach(function (x) {
+          x.classList.toggle('on', x.dataset.tool === map[e.key]);
+        });
+        self.tool = map[e.key];
+      }
+    });
+  };
+
+  UI.prototype.togglePause = function () {
+    var g = this.game;
+    g.speed = g.speed === 0 ? 1 : 0;
+    document.querySelectorAll('.speed button').forEach(function (x) {
+      x.classList.toggle('on', Number(x.dataset.speed) === g.speed);
+    });
+  };
+
+  /* ---------- pointer ---------- */
+  UI.prototype.bindCanvas = function () {
+    var self = this, cv = el('view'), dragging = null;
+
+    function worldPos(ev) {
+      var r = cv.getBoundingClientRect();
+      var px = ev.clientX - r.left, py = ev.clientY - r.top;
+      var g = self.game;
+      return {
+        x: g.renderer.toWorld(px),
+        y: g.world.groundY - (g.renderer.groundScreenY() - g.renderer.screenToViewY(py))
+      };
+    }
+
+    function pick(p) {
+      var g = self.game, best = null, bestD = 46;
+      g.world.creatures.forEach(function (c) {
+        var d = Math.abs(c.x - p.x);
+        if (c.alive && d < bestD + 18) { bestD = d; best = c; }
+      });
+      if (best) return best;
+      g.world.objects.forEach(function (o) {
+        if (o.eaten) return;
+        var d = Math.abs(o.x - p.x);
+        var lim = Math.max(26, o.r);
+        if (d < lim && (!best || d < bestD)) { bestD = d; best = o; }
+      });
+      return best;
+    }
+
+    cv.addEventListener('pointerdown', function (ev) {
+      cv.setPointerCapture(ev.pointerId);
+      var p = worldPos(ev), hit = pick(p);
+      self.game.world.hand.active = true;
+      self.game.world.hand.x = p.x;
+      self.game.world.hand.y = CG.clamp(p.y, 60, self.game.world.groundY);
+
+      if (self.tool === 'carry') {
+        if (hit && (hit.movable !== false)) {
+          if (hit instanceof CG.Creature) { hit.held = true; }
+          else if (CG.KINDS[hit.kind] && (CG.KINDS[hit.kind].movable || hit.kind === 'berry' || hit.kind === 'egg')) {
+            hit.held = true;
+          } else { self.toast('The ' + self.labelOf(hit) + ' is rooted to the spot.'); hit = null; }
+          if (hit) { dragging = hit; self.game.world.hand.holding = hit; }
+        }
+        return;
+      }
+      if (!hit) return;
+
+      if (hit instanceof CG.Creature) {
+        if (self.tool === 'tickle') { hit.tickle(); self.toast('You tickled ' + hit.name + '.'); }
+        else if (self.tool === 'scold') { hit.scold(); self.toast('You scolded ' + hit.name + '.'); }
+        else { self.select(hit); }
+      } else if (self.tool === 'point') {
+        self.pointAt(hit);
+      }
+    });
+
+    cv.addEventListener('pointermove', function (ev) {
+      var p = worldPos(ev), h = self.game.world.hand;
+      h.active = true;
+      h.x = CG.clamp(p.x, 0, self.game.world.w);
+      h.y = CG.clamp(p.y, 60, self.game.world.groundY);
+      if (dragging) {
+        dragging.x = h.x;
+        if (dragging.vx != null) dragging.vx = 0;
+      }
+    });
+
+    function release() {
+      if (dragging) {
+        dragging.held = false;
+        self.game.world.hand.holding = null;
+        dragging = null;
+      }
+    }
+    cv.addEventListener('pointerleave', function () {
+      if (!dragging) self.game.world.hand.active = false;
+    });
+    cv.addEventListener('pointerup', release);
+    cv.addEventListener('pointercancel', release);
+    cv.addEventListener('wheel', function (ev) {
+      /* let the player look around without losing their sprig */
+      self.game.renderer.camX = CG.clamp(
+        self.game.renderer.camX + (Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY),
+        0, self.game.world.w);
+      self.game.followSelected = false;
+      clearTimeout(self._panT);
+      self._panT = setTimeout(function () { self.game.followSelected = true; }, 2600);
+      ev.preventDefault();
+    }, { passive: false });
+  };
+
+  UI.prototype.labelOf = function (o) {
+    if (o instanceof CG.Creature) return o.name;
+    return (CG.KINDS[o.kind] && CG.KINDS[o.kind].label) || o.kind;
+  };
+
+  /* Pointing is the main teaching move: it aims a sprig's attention at a thing
+   * and names it in the same gesture. */
+  UI.prototype.pointAt = function (obj) {
+    var c = this.selected;
+    var word = CG.CAT_LABEL[obj.cat];
+    if (!c || !c.alive) { this.toast('No sprig is listening.'); return; }
+    c.focus = obj;
+    c.focusDist = Math.abs(obj.x - c.x);
+    c.soup.add('curiosity', 0.25);
+    this.game.world.spawnEvent('spark', obj.x, this.game.world.groundY - 40);
+    if (word) {
+      this.sayTo(c, word, 0.95);
+      this.toast('“' + word + '” — ' + c.name + ' is looking at the ' + this.labelOf(obj) + '.');
+    } else {
+      this.toast(c.name + ' looks at the ' + this.labelOf(obj) + '.');
+    }
+  };
+
+  /* Saying a word aloud. Whoever is close enough hears it in whatever situation
+   * they happen to be in - which is exactly how the misunderstandings happen. */
+  UI.prototype.say = function (word) {
+    var hand = this.game.world.hand, heard = 0, self = this;
+    this.game.world.creatures.forEach(function (c) {
+      if (!c.alive || c.asleep) return;
+      var d = Math.abs(c.x - hand.x);
+      if (c === self.selected || d < 320) {
+        self.sayTo(c, word, c === self.selected ? 0.85 : 0.5);
+        heard++;
+      }
+    });
+    this.game.world.spawnEvent('call', hand.x, hand.y);
+    this.toast(heard ? 'You said “' + word + '”.' : 'Nobody was near enough to hear.');
+  };
+
+  UI.prototype.sayTo = function (c, word, attention) {
+    c.hear(word, attention);
+    this.refreshWordMarks();
+  };
+
+  UI.prototype.select = function (c) {
+    this.selected = c;
+    this.game.followSelected = true;
+    this.refreshRoster();
+    this.refreshWordMarks();
+  };
+
+  UI.prototype.toast = function (msg) {
+    var t = el('toast');
+    t.textContent = msg;
+    t.hidden = false;
+    this.toastT = 2.6;
+  };
+
+  UI.prototype.logLine = function (msg) {
+    this.journal.push({ msg: msg, t: 5.5 });
+    if (this.journal.length > 5) this.journal.shift();
+    this.renderJournal();
+  };
+
+  UI.prototype.renderJournal = function () {
+    var wrap = el('journal');
+    wrap.innerHTML = '';
+    this.journal.forEach(function (j) {
+      var d = document.createElement('div');
+      d.textContent = j.msg;
+      d.style.opacity = CG.clamp01(j.t / 1.4);
+      wrap.appendChild(d);
+    });
+  };
+
+  /* ---------- per-frame chrome ---------- */
+  UI.prototype.tick = function (dt) {
+    var i;
+    if (this.toastT > 0) {
+      this.toastT -= dt;
+      if (this.toastT <= 0) el('toast').hidden = true;
+    }
+    var dirty = false;
+    for (i = this.journal.length - 1; i >= 0; i--) {
+      this.journal[i].t -= dt;
+      if (this.journal[i].t <= 0) { this.journal.splice(i, 1); dirty = true; }
+      else if (this.journal[i].t < 1.4) dirty = true;
+    }
+    if (dirty) this.renderJournal();
+
+    this.lastHud += dt;
+    if (this.lastHud < 0.14) return;
+    this.lastHud = 0;
+    this.refreshHud();
+    if (!el('science').hidden) this.renderScience();
+  };
+
+  var NEED_COLOUR = {
+    hunger: '#ffb26b', thirst: '#7ec8ff', fatigue: '#b7a4ff', lonely: '#ff9ec4',
+    bored: '#c9d06b', cold: '#8fd8ff', hot: '#ff8f7a', pain: '#ff7a7a',
+    fear: '#d0a0ff', sexdrive: '#ff9ad2', sick: '#9ee0a8'
+  };
+
+  UI.prototype.refreshHud = function () {
+    var g = this.game, w = g.world;
+    el('dayLabel').textContent = 'Day ' + w.dayCount() + (w.nightFactor() > 0.55 ? ' · night' : '');
+    var alive = w.living().length;
+    el('popLabel').textContent = alive + (alive === 1 ? ' sprig' : ' sprigs');
+
+    var c = this.selected;
+    if (!c) { this.refreshRoster(); return; }
+
+    el('cName').textContent = c.name;
+    el('cStage').textContent = c.alive ? c.stage : 'died';
+    el('cSex').textContent = c.sex === 'f' ? 'she' : 'he';
+    el('cStatus').textContent = c.describeState();
+
+    var vocab = Object.keys(c.brain.words)
+      .sort(function (a, b) { return c.brain.wordStrength(b) - c.brain.wordStrength(a); })
+      .slice(0, 6);
+    el('cVocab').textContent = vocab.length
+      ? 'knows: ' + vocab.join(', ')
+      : 'has not learned any words yet';
+
+    /* Only the needs that are actually pressing, plus health. Showing eleven
+     * bars at all times would be honest and useless. */
+    var needs = [];
+    for (var i = 0; i < CG.DRIVES.length; i++) {
+      if (c.drives[i] > 0.12) needs.push({ k: CG.DRIVES[i], v: c.drives[i] });
+    }
+    needs.sort(function (a, b) { return b.v - a.v; });
+    needs = needs.slice(0, 5);
+    needs.unshift({ k: 'health', v: c.health, good: true });
+
+    var html = '';
+    needs.forEach(function (n) {
+      var col = n.good ? (n.v > 0.5 ? '#7fd1a6' : '#ff8f7a') : (NEED_COLOUR[n.k] || '#aaa');
+      var label = n.good ? 'health' : CG.DRIVE_LABEL[n.k].toLowerCase();
+      html += '<div class="need"><i>' + label + '</i><div class="bar"><em style="width:' +
+        (n.v * 100).toFixed(0) + '%;background:' + col + '"></em></div></div>';
+    });
+    el('needs').innerHTML = html;
+
+    var pc = el('portrait');
+    CG.drawPortrait(pc.getContext('2d'), c, pc.width, pc.height);
+    this.refreshRoster();
+  };
+
+  UI.prototype.refreshRoster = function () {
+    var self = this, list = el('rosterList'), w = this.game.world;
+    var sig = w.creatures.map(function (c) { return c.id + (c.alive ? '1' : '0'); }).join(',') +
+      '|' + (this.selected ? this.selected.id : '');
+    if (sig === this._rosterSig) return;
+    this._rosterSig = sig;
+    list.innerHTML = '';
+    w.creatures.slice(-8).forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (c === self.selected ? ' on' : '') + (c.alive ? '' : ' dead');
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = 'hsl(' + c.C.traits.hue + ',' + (c.C.traits.sat * 100) + '%,' +
+        (c.C.traits.light * 100) + '%)';
+      b.appendChild(dot);
+      b.appendChild(document.createTextNode(c.name));
+      b.addEventListener('click', function () { self.select(c); });
+      list.appendChild(b);
+    });
+  };
+
+  UI.prototype.refreshWordMarks = function () {
+    var c = this.selected;
+    Array.prototype.forEach.call(document.querySelectorAll('#words button'), function (b) {
+      var s = c ? c.brain.wordStrength(b.dataset.word) : 0;
+      b.classList.toggle('known', s > 0.05);
+      b.style.setProperty('--know', s.toFixed(2));
+    });
+  };
+
+  /* ---------- the Inside drawer ---------- */
+  UI.prototype.renderScience = function () {
+    var c = this.selected, body = el('sciBody');
+    if (!c) { body.innerHTML = '<p class="note">Select a sprig first.</p>'; return; }
+    if (this.sciTab === 'chem') body.innerHTML = this.chemHtml(c);
+    else if (this.sciTab === 'brain') body.innerHTML = this.brainHtml(c);
+    else if (this.sciTab === 'genes') body.innerHTML = this.genesHtml(c);
+    else body.innerHTML = this.familyHtml(c);
+  };
+
+  function bar(label, v, colour, valueText) {
+    return '<div class="crow"><span>' + label + '</span><div class="bar"><em style="width:' +
+      (CG.clamp01(v) * 100).toFixed(0) + '%;background:' + colour + '"></em></div><b>' +
+      (valueText != null ? valueText : v.toFixed(2)) + '</b></div>';
+  }
+
+  UI.prototype.chemHtml = function (c) {
+    var h = '<p class="note">Everything ' + c.name + ' feels is one of these numbers. ' +
+      'Food and praise push them up; time and reactions pull them down.</p>';
+    CG.CHEM_GROUPS.forEach(function (grp) {
+      h += '<h4>' + grp.name + '</h4>';
+      grp.chems.forEach(function (name) {
+        var v = c.soup.get(name);
+        if (v < 0.005 && grp.name === 'Health') return;
+        h += bar(name, v, v > 0.66 ? '#ffcf7a' : '#7fd1a6');
+      });
+    });
+    h += '<h4>Body</h4>';
+    h += bar('health', c.health, c.health > 0.5 ? '#7fd1a6' : '#ff8f7a');
+    h += bar('age', CG.clamp01(c.age / c.lifespan), '#9fb4ff',
+      CG.fmtAge(c.age) + ' / ' + CG.fmtAge(c.lifespan));
+    h += bar('warmth', CG.clamp01(0.5 - (c.temp || 0) / 2), '#8fd8ff');
+    h += bar('feeling', CG.clamp01(0.5 + (c.lastReward || 0) * 2),
+      (c.lastReward || 0) >= 0 ? '#7fd1a6' : '#ff8f7a', (c.lastReward || 0).toFixed(3));
+    return h;
+  };
+
+  UI.prototype.brainHtml = function (c) {
+    var D = CG.BRAIN_DIMS, W = c.brain.W, nA = D.nA, nC = D.nC, i, j;
+    var h = '<p class="note">What ' + c.name + ' has worked out so far. Each row is a ' +
+      'situation; the action shown is the one it now reaches for, and the bar is how ' +
+      'sure it is. Praise and scolding move these.</p><h4>When it is…</h4>';
+
+    /* strongest learned pairing for each drive-and-thing combination */
+    var rows = [];
+    for (i = 0; i < CG.DRIVES.length; i++) {
+      for (j = 0; j < nC; j++) {
+        var base = (D.OFF_X + i * nC + j) * nA, bestA = 0, bestV = -Infinity, tot = 0;
+        for (var a = 0; a < nA; a++) {
+          var v = W[base + a];
+          tot += Math.abs(v);
+          if (v > bestV) { bestV = v; bestA = a; }
+        }
+        if (bestV > 0.35) {
+          rows.push({ text: CG.DRIVE_LABEL[CG.DRIVES[i]].toLowerCase() + ' + ' + CG.CAT_LABEL[CG.CATS[j]],
+            act: CG.ACTIONS[bestA], v: bestV });
+        }
+      }
+    }
+    rows.sort(function (x, y) { return y.v - x.v; });
+    if (!rows.length) h += '<p class="note">Nothing firm yet — it is still all instinct and guesswork.</p>';
+    rows.slice(0, 14).forEach(function (r) {
+      h += bar(r.text, CG.clamp01(r.v / 4), '#7fd1a6', r.act);
+    });
+
+    h += '<h4>Words</h4>';
+    var words = Object.keys(c.brain.words);
+    if (!words.length) h += '<p class="note">' + c.name + ' has not heard a word yet.</p>';
+    words.sort(function (a, b) { return c.brain.wordStrength(b) - c.brain.wordStrength(a); });
+    words.forEach(function (w) {
+      var meaning = c.brain.wordMeaning(w);
+      h += '<div class="wordrow"><b>' + w + '</b><span>' +
+        (meaning ? 'thinks it means “' + meaning + '”' : 'no idea yet') +
+        ' · heard ' + c.brain.words[w].heard + '×</span></div>';
+    });
+
+    h += '<h4>Right now</h4>';
+    h += '<p class="note">restlessness ' + ((c.misery || 0)).toFixed(2) +
+      ' · curiosity ' + (c.brain.explore).toFixed(2) +
+      ' · learning ' + (c.brain.learnRate).toFixed(2) + '</p>';
+    return h;
+  };
+
+  UI.prototype.genesHtml = function (c) {
+    var g = c.genome, T = c.C.traits;
+    var h = '<p class="note">Generation ' + (g.gen || 1) + ' · ' + g.genes.length +
+      ' genes · <b>' + CG.genome.describe(g) + '</b></p><h4>Traits</h4><div class="genelist">';
+    var shown = ['bodySize', 'lifespan', 'metabolism', 'appetite', 'learnRate', 'curiosity',
+      'boldness', 'sociability', 'patience', 'immunity', 'fertility', 'tempers', 'mutability'];
+    shown.forEach(function (k) {
+      var d = CG.TRAITS[k];
+      h += '<div class="gene"><b>' + k + '</b><span>' +
+        (k === 'lifespan' ? CG.fmtAge(T[k]) : T[k].toFixed(2)) +
+        ' <em style="opacity:.55">(typical ' + (k === 'lifespan' ? CG.fmtAge(d[2]) : d[2].toFixed(2)) +
+        ')</em></span></div>';
+    });
+    h += '</div><h4>Biochemistry</h4><div class="genelist">';
+    c.C.reactions.slice(0, 24).forEach(function (r) {
+      var lhs = CG.CHEMS[r.a] + (r.b >= 0 ? ' + ' + CG.CHEMS[r.b] : '');
+      var rhs = r.out.length ? r.out.map(function (o) { return CG.CHEMS[o[0]]; }).join(' + ') : 'nothing';
+      h += '<div class="gene"><b>' + (r.k || '').replace('rx:', '') + '</b><span>' +
+        lhs + ' → ' + rhs + ' <em style="opacity:.55">(rate ' + r.rate.toFixed(3) + ')</em></span></div>';
+    });
+    h += '</div><h4>Wiring</h4><div class="genelist">';
+    c.C.receptors.slice(0, 22).forEach(function (r) {
+      h += '<div class="gene"><b>' + CG.CHEMS[r.chem] + '</b><span>' +
+        (r.gain < 0 ? 'lowers ' : 'raises ') + r.tgt.replace(':', ' ') +
+        ' <em style="opacity:.55">(×' + Math.abs(r.gain).toFixed(2) + ')</em></span></div>';
+    });
+    h += '</div>';
+    if (c.C.lethal) h += '<p class="note" style="color:#ff8f7a">Genetic fault: ' + c.C.lethal + '.</p>';
+    return h;
+  };
+
+  UI.prototype.familyHtml = function (c) {
+    var w = this.game.world;
+    var h = '<h4>' + c.name + '</h4><p class="note">' +
+      (c.genome.mumId ? 'Born to a pairing in this valley.' : 'Hatched from a fresh genome.') +
+      ' Generation ' + (c.genome.gen || 1) + '.</p>';
+    h += '<h4>A life so far</h4>';
+    h += bar('meals', CG.clamp01(c.stats.eaten / 60), '#ffb26b', String(c.stats.eaten));
+    h += bar('drinks', CG.clamp01(c.stats.drunk / 90), '#7ec8ff', c.stats.drunk.toFixed(0) + 's');
+    h += bar('play', CG.clamp01(c.stats.played / 90), '#c9d06b', c.stats.played.toFixed(0) + 's');
+    h += bar('praised', CG.clamp01(c.stats.tickles / 20), '#7fd1a6', String(c.stats.tickles));
+    h += bar('scolded', CG.clamp01(c.stats.scolds / 20), '#ff8f7a', String(c.stats.scolds));
+    h += bar('words heard', CG.clamp01(c.brain.wordCount / 12), '#9fb4ff', String(c.brain.wordCount));
+    h += bar('offspring', CG.clamp01(c.stats.children / 6), '#ff9ec4', String(c.stats.children));
+
+    h += '<h4>The valley</h4><p class="note">' +
+      w.stats.born + ' hatched · ' + w.stats.died + ' died · ' +
+      'generation ' + w.stats.generations + ' reached.</p>';
+
+    h += '<h4>Journal</h4><div class="genelist">';
+    (w.journal || []).slice(-14).reverse().forEach(function (j) {
+      h += '<div class="gene"><b>day ' + (Math.floor(j.t / CG.DAY_LENGTH) + 1) + '</b><span>' + j.msg + '</span></div>';
+    });
+    h += '</div>';
+    return h;
+  };
+
+  /* ---------- persistence ---------- */
+  UI.prototype.save = function () {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.game.world.toJSON()));
+      return true;
+    } catch (e) { return false; }
+  };
+  UI.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  };
+
+  CG.UI = UI;
+  CG.VOCAB = VOCAB;
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+/* ===== src/main.js ===== */
+/* Sprigs - boot and the main loop. */
+(function (CG) {
+  'use strict';
+
+  var STEP = 1 / 30;          /* fixed simulation step, in simulated seconds */
+  var MAX_STEPS = 12;         /* never let a slow frame spiral */
+
+  function Game() {
+    this.speed = 1;
+    this.followSelected = true;
+    this.acc = 0;
+    this.lastT = 0;
+    this.saveT = 0;
+
+    var saved = CG.UI.loadSaved();
+    if (saved && saved.creatures && saved.creatures.length) {
+      try { this.world = CG.World.load(saved); }
+      catch (e) { this.world = this.freshWorld(); }
+    } else {
+      this.world = this.freshWorld();
+    }
+
+    this.renderer = new CG.Renderer(document.getElementById('view'), this.world);
+    this.ui = new CG.UI(this);
+
+    var self = this;
+    this.world.onLog = function (msg) { self.ui.logLine(msg); };
+
+    var first = this.world.living()[0] || this.world.creatures[0];
+    if (first) this.ui.select(first);
+    this.renderer.follow(first || { x: 700 }, 0, true);
+
+    window.addEventListener('resize', function () { self.renderer.resize(); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) self.ui.save();
+      self.lastT = 0;   /* do not fast forward through the time we were away */
+    });
+
+    try {
+      if (!localStorage.getItem('sprigs.seenHelp')) document.getElementById('help').hidden = false;
+    } catch (e) { document.getElementById('help').hidden = false; }
+
+    this.frame = this.frame.bind(this);
+    requestAnimationFrame(this.frame);
+  }
+
+  Game.prototype.freshWorld = function () {
+    var w = new CG.World((Math.random() * 1e9) | 0);
+    var rng = new CG.RNG((Math.random() * 1e9) | 0);
+    /* Two eggs, one of each sex, so the valley has a chance of a second
+     * generation without the player having to arrange anything. */
+    var a = w.layEgg(CG.genome.wildType(rng), 820);
+    var b = w.layEgg(CG.genome.wildType(rng), 900);
+    a.hatch = 6; a.sex = 'f';
+    b.hatch = 11; b.sex = 'm';
+    return w;
+  };
+
+  Game.prototype.addEgg = function () {
+    var rng = new CG.RNG((Math.random() * 1e9) | 0);
+    var egg = this.world.layEgg(CG.genome.wildType(rng), 860);
+    egg.hatch = 20;
+    this.world.log('A new egg appeared in the nest.');
+  };
+
+  Game.prototype.frame = function (now) {
+    requestAnimationFrame(this.frame);
+    var real = this.lastT ? Math.min((now - this.lastT) / 1000, 0.25) : 0;
+    this.lastT = now;
+
+    var simTime = real * this.speed;
+    this.acc += simTime;
+    var steps = 0;
+    while (this.acc >= STEP && steps < MAX_STEPS) {
+      this.step(STEP);
+      this.acc -= STEP;
+      steps++;
+    }
+    if (steps === MAX_STEPS) this.acc = 0;
+
+    var sel = this.ui.selected;
+    if (this.followSelected && sel && sel.alive) this.renderer.follow(sel, real);
+    this.renderer.render(sel);
+    this.ui.tick(real || 0.016);
+
+    this.saveT += real;
+    if (this.saveT > 20) { this.saveT = 0; this.ui.save(); }
+  };
+
+  Game.prototype.step = function (dt) {
+    var w = this.world, i;
+    w.update(dt);
+    for (i = 0; i < w.creatures.length; i++) w.creatures[i].update(dt);
+
+    /* Forget the long dead so a hundred-generation valley stays quick. */
+    if (w.creatures.length > 26) {
+      for (i = 0; i < w.creatures.length; i++) {
+        if (!w.creatures[i].alive && w.creatures[i] !== this.ui.selected) {
+          w.creatures.splice(i, 1);
+          break;
+        }
+      }
+    }
+    /* If everyone has died, keep the world alive rather than stranding the
+     * player in an empty valley with no way back. */
+    if (!w.living().length) {
+      this.emptyFor = (this.emptyFor || 0) + dt;
+      if (this.emptyFor > 12) {
+        this.emptyFor = 0;
+        this.addEgg();
+        w.log('The valley was empty, so a new egg was left in the nest.');
+      }
+    } else this.emptyFor = 0;
+
+    /* Selection should never be left pointing at nothing. */
+    var sel = this.ui.selected;
+    if ((!sel || (!sel.alive && w.living().length)) && w.living().length) {
+      var next = w.living()[0];
+      if (!sel || !sel.alive) this.ui.select(next);
+    }
+  };
+
+  window.addEventListener('DOMContentLoaded', function () {
+    window.game = new Game();
+  });
+})(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));
+
+</script>

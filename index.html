@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sprigs — a tiny world of learning creatures</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <h1>Sprigs</h1>
+    <div class="worldinfo">
+      <span id="dayLabel">Day 1</span>
+      <span class="sep">·</span>
+      <span id="popLabel">2 sprigs</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="speed" role="group" aria-label="Speed">
+      <button data-speed="0" title="Pause">❚❚</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="3">3×</button>
+      <button data-speed="8">8×</button>
+    </div>
+    <button id="btnScience" class="ghost" title="Look inside">Inside</button>
+    <button id="btnHelp" class="ghost" title="How to play">?</button>
+  </header>
+
+  <main id="stage">
+    <canvas id="view"></canvas>
+
+    <div class="tools" role="group" aria-label="What your hand does">
+      <button data-tool="point" class="on"><span>👆</span><b>Point</b></button>
+      <button data-tool="carry"><span>✋</span><b>Carry</b></button>
+      <button data-tool="tickle"><span>🪶</span><b>Tickle</b></button>
+      <button data-tool="scold"><span>👎</span><b>Scold</b></button>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="journal" class="journal" aria-live="polite"></div>
+  </main>
+
+  <div id="wordbar" class="wordbar">
+    <span class="wblabel">Say:</span>
+    <div id="words" class="words"></div>
+  </div>
+
+  <footer id="hud">
+    <div class="who">
+      <canvas id="portrait" width="76" height="76"></canvas>
+      <div class="whotext">
+        <div class="nameline">
+          <strong id="cName">—</strong>
+          <span id="cStage" class="pill"></span>
+          <span id="cSex" class="pill"></span>
+        </div>
+        <div id="cStatus" class="status">Waiting for an egg to hatch…</div>
+        <div id="cVocab" class="vocab"></div>
+      </div>
+    </div>
+    <div id="needs" class="needs"></div>
+    <div class="roster">
+      <div id="rosterList"></div>
+      <button id="btnEgg" class="primary" title="Add a new sprig from a fresh genome">＋ New egg</button>
+    </div>
+  </footer>
+
+  <aside id="science" class="science" hidden>
+    <div class="scihead">
+      <div class="tabs" role="tablist">
+        <button data-tab="chem" class="on">Chemistry</button>
+        <button data-tab="brain">Mind</button>
+        <button data-tab="genes">Genes</button>
+        <button data-tab="family">Family</button>
+      </div>
+      <button id="btnCloseSci" class="ghost">✕</button>
+    </div>
+    <div id="sciBody" class="scibody"></div>
+  </aside>
+
+  <div id="help" class="modal" hidden>
+    <div class="sheet">
+      <h2>Sprigs</h2>
+      <p>A sprig is not scripted. It has a body full of chemicals, a small brain
+         that learns from how it feels, and a genome that decides how both are
+         wired. Nothing it does was written down in advance.</p>
+      <h3>Looking after one</h3>
+      <ul>
+        <li><b>Point</b> at something to draw a sprig's attention to it — and to
+            teach it that thing's name.</li>
+        <li><b>Tickle</b> to praise. Whatever it was just doing, it will do more
+            of. <b>Scold</b> to discourage. Both work through real chemistry, so
+            they take a few seconds to sink in.</li>
+        <li><b>Carry</b> to pick things up — including sprigs. Put a cold one by
+            the lamp, or two grown ones together.</li>
+        <li><b>Say</b> a word from the bar. Say it while a sprig can see what you
+            mean and it will slowly work out what the word refers to. Eventually
+            it will use the word back at you.</li>
+      </ul>
+      <h3>The valley</h3>
+      <p>Berries and bushes are food. Pools are water. The lamp is warm, the
+         grotto in the west is cold. The white-flowered herb cures illness. The
+         purple weeds out past the lamp are poisonous — a sprig has to learn that
+         the hard way, and it will remember.</p>
+      <h3>Growing up</h3>
+      <p>Sprigs pass through baby, child, adolescent, adult and elder. Two adults
+         who spend time together may lay an egg, and the hatchling's genome is a
+         genuine mix of theirs with mutations of its own. Colour, shape, appetite,
+         temper and how quickly it learns are all inherited.</p>
+      <p class="quiet">Open <b>Inside</b> to watch the chemistry, the mind and the
+         genome of whichever sprig is selected.</p>
+      <div class="sheetbtns">
+        <button id="btnCloseHelp" class="primary">Let me in</button>
+        <button id="btnReset" class="ghost">Start a new valley</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="src/util.js"></script>
+<script src="src/chemistry.js"></script>
+<script src="src/genome.js"></script>
+<script src="src/brain.js"></script>
+<script src="src/world.js"></script>
+<script src="src/creature.js"></script>
+<script src="src/render.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

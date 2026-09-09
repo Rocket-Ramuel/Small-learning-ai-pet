@@ -88,7 +88,7 @@
     rx('temper', 'painsig', 1, null, 0, [['anger', 0.5], ['adrenaline', 0.4]], 0.35);
     rx('comfort', 'endorphin', 1, 'cortisol', 1, [], 0.9);
     /* illness */
-    rx('poison', 'toxin', 1, null, 0, [['sickness', 0.9], ['painsig', 0.4]], 0.09);
+    rx('poison', 'toxin', 1, null, 0, [['sickness', 0.9], ['painsig', 0.4]], 0.32);
     rx('detox', 'toxin', 1, 'antitoxin', 1, [], 1.4);
     rx('immune', 'sickness', 1, 'antibody', 1, [], 1.1);
     rx('malaise', 'sickness', 1, 'glucose', 0.3, [['fatiguesig', 0.5]], 0.15);
@@ -121,13 +121,13 @@
     em('unstimulated', 'curiosity', 0.35, 0.35);
     em('threat', 'fearsig', 0.15, 1.1);
     em('injury', 'painsig', 0.05, 1.0);
-    em('chilly', 'coldsig', 0.2, 0.55);
-    em('sweaty', 'heatsig', 0.2, 0.55);
+    em('chilly', 'coldsig', 0.32, 0.6);
+    em('sweaty', 'heatsig', 0.32, 0.6);
     em('mature', 'sexdrive', 0.6, 0.16);
     em('mature', 'growth', 0.85, 0.1, true);
     em('exertion', 'wakeful', 0.35, 0.35);
-    em('sickLoad', 'antibody', 0.1, 0.35);
-    em('toxLoad', 'antitoxin', 0.12, 0.3);
+    em('sickLoad', 'antibody', 0.22, 0.16);
+    em('toxLoad', 'antitoxin', 0.28, 0.14);
 
     function rc(chem, tgt, thresh, gain, invert) {
       g.push({ t: 'receptor', k: 'rc:' + chem + '>' + tgt, chem: CI[chem], tgt: tgt,

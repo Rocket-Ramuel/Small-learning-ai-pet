@@ -214,6 +214,7 @@
   World.prototype.hatch = function (egg) {
     this.remove(egg);
     var c = new CG.Creature(egg.genome, this.rng.fork(), egg.x, this);
+    if (egg.sex) c.sex = egg.sex;   /* the opening pair is deliberately a pair */
     this.creatures.push(c);
     this.stats.born++;
     this.stats.generations = Math.max(this.stats.generations, egg.genome.gen || 1);
@@ -231,6 +232,38 @@
 
   World.prototype.living = function () {
     return this.creatures.filter(function (c) { return c.alive; });
+  };
+
+  /* ---------- saving ---------- */
+  World.prototype.toJSON = function () {
+    return {
+      v: 1, seed: this.seed, time: this.time, stats: this.stats,
+      journal: (this.journal || []).slice(-40),
+      objects: this.objects.map(function (o) {
+        return { kind: o.kind, x: o.x, berries: o.berries, eaten: o.eaten,
+          regrow: o.regrow, hatch: o.hatch, life: o.life, vx: o.vx, genome: o.genome, sex: o.sex };
+      }),
+      creatures: this.creatures.map(function (c) { return c.toJSON(); })
+    };
+  };
+
+  World.load = function (data) {
+    var w = new World(data.seed);
+    w.objects.length = 0;
+    w.time = data.time || 0;
+    if (data.stats) w.stats = data.stats;
+    w.journal = data.journal || [];
+    data.objects.forEach(function (o) {
+      var obj = new Obj(o.kind, o.x, {});
+      obj.berries = o.berries; obj.eaten = o.eaten; obj.regrow = o.regrow;
+      obj.hatch = o.hatch; obj.life = o.life; obj.vx = o.vx || 0;
+      if (o.genome) obj.genome = o.genome;
+      if (o.sex) obj.sex = o.sex;
+      if (o.kind === 'bush') obj.cat = obj.berries > 0 ? 'food' : 'plant';
+      w.objects.push(obj);
+    });
+    data.creatures.forEach(function (c) { w.creatures.push(CG.Creature.fromJSON(c, w)); });
+    return w;
   };
 
   CG.World = World;

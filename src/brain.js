@@ -30,6 +30,16 @@
     approach: 'going to', retreat: 'backing away', wander: 'wandering', call: 'calling out',
     push: 'pushing', mate: 'courting'
   };
+  /* The same actions with a target, and as something to be attempting. */
+  var ACTION_AT = {
+    eat: 'eating', drink: 'drinking', play: 'playing with', approach: 'going to',
+    retreat: 'backing away from', push: 'pushing', mate: 'courting'
+  };
+  var ACTION_TRY = {
+    rest: 'settle', eat: 'eat', drink: 'drink', play: 'play with', sleep: 'settle down',
+    approach: 'reach', retreat: 'get away from', wander: 'wander', call: 'call out',
+    push: 'push', mate: 'court'
+  };
 
   var nD = CG.DRIVES.length, nC = CATS.length, nA = ACTIONS.length;
   var nConj = nD * nC;
@@ -289,6 +299,7 @@
 
   CG.CATS = CATS; CG.CAT_LABEL = CAT_LABEL;
   CG.ACTIONS = ACTIONS; CG.ACTION_LABEL = ACTION_LABEL;
+  CG.ACTION_AT = ACTION_AT; CG.ACTION_TRY = ACTION_TRY;
   CG.Brain = Brain;
   CG.BRAIN_DIMS = { nIn: nIn, nA: nA, nC: nC, nD: nD, OFF_D: OFF_D, OFF_C: OFF_C, OFF_X: OFF_X, OFF_E: OFF_E };
 })(typeof window !== 'undefined' ? (window.CG = window.CG || {}) : (globalThis.CG = globalThis.CG || {}));

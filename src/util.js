@@ -45,7 +45,26 @@
   var HEAD = ['b', 'br', 'c', 'd', 'f', 'g', 'j', 'k', 'l', 'm', 'n', 'p', 'pl', 'q', 'r', 's', 'sh', 't', 'th', 'tr', 'v', 'w', 'z'];
   var VOW = ['a', 'e', 'i', 'o', 'u', 'ee', 'oo', 'ai', 'ou', 'ey'];
   var TAIL = ['b', 'd', 'ff', 'k', 'l', 'm', 'n', 'p', 'sh', 't', 'x', 'z', 'ble', 'kin', 'let', 'ns'];
+  /* Random syllables occasionally spell something you would not want to name a
+   * pet. Cheap to check, and worth checking. */
+  var UNLOVELY = ['sex', 'ass', 'tit', 'cum', 'fuk', 'fuc', 'cok', 'coc', 'dik', 'dic',
+    'pis', 'shi', 'sht', 'wank', 'twat', 'cunt', 'nig', 'fag', 'rape', 'anal', 'anus',
+    'poo', 'pee', 'bum', 'nazi', 'kkk', 'hell', 'damn'];
+  function unlovely(name) {
+    var n = name.toLowerCase();
+    for (var i = 0; i < UNLOVELY.length; i++) if (n.indexOf(UNLOVELY[i]) >= 0) return true;
+    return false;
+  }
+
   function makeName(rng) {
+    for (var tries = 0; tries < 12; tries++) {
+      var candidate = makeNameOnce(rng);
+      if (!unlovely(candidate)) return candidate;
+    }
+    return 'Pip';
+  }
+
+  function makeNameOnce(rng) {
     var n = rng.pick(HEAD) + rng.pick(VOW);
     if (rng.chance(0.55)) n += rng.pick(TAIL) + rng.pick(VOW);
     n += rng.chance(0.7) ? rng.pick(TAIL) : '';

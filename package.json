@@ -1,0 +1,12 @@
+{
+  "name": "sprigs",
+  "version": "1.0.0",
+  "description": "A small artificial-life game in the spirit of Creatures (1996)",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve .",
+    "build": "node tools/build.mjs",
+    "test": "node test/headless.js 3000 1 && node test/headless.js 3000 13"
+  },
+  "license": "MIT"
+}

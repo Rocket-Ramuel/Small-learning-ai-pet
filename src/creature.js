@@ -228,7 +228,7 @@
     var s = this.soup, dmg = 0;
     if (s.get('glucose') < 0.05) dmg += 0.009 * (0.05 - s.get('glucose')) / 0.05;
     if (s.get('water') < 0.05) dmg += 0.011 * (0.05 - s.get('water')) / 0.05;
-    if (s.get('sickness') > 0.45) dmg += (s.get('sickness') - 0.45) * 0.020 / Math.max(0.3, this.C.traits.immunity);
+    if (s.get('sickness') > 0.5) dmg += (s.get('sickness') - 0.5) * 0.011 / Math.max(0.3, this.C.traits.immunity);
     var over = this.age - this.lifespan;
     if (over > 0) dmg += 0.004 + over / this.lifespan * 0.03;
     dmg += Math.max(0, Math.abs(this.temp || 0) - 0.75) * 0.02;
@@ -521,7 +521,7 @@
       s.add('antitoxin', 0.55); s.add('antibody', 0.5); s.add('starch', 0.05);
       o.eaten = true; o.regrow = 70;
     } else if (o.kind === 'weed') {
-      s.add('starch', 0.16); s.add('toxin', 0.42);
+      s.add('starch', 0.16); s.add('toxin', 0.55);
       o.eaten = true; o.regrow = 55;
     } else { this.frustrate(0.02); return; }
     /* Taste is its own small reward, and it arrives instantly. The real lesson
@@ -691,12 +691,19 @@
     if (this.asleep) return this.name + ' is fast asleep.';
     var d = this.topDrive();
     var need = d >= 0 ? CG.DRIVE_LABEL[CG.DRIVES[d]].toLowerCase() : 'content';
-    var doing = CG.ACTION_LABEL[CG.ACTIONS[this.action]];
+    var name = CG.ACTIONS[this.action];
+    var directed = !!CG.ACTION_AT[name];
+    var target = (directed && this.focus) ? this.focus : null;
     var at = '';
-    if (this.focus && (this.action === A.approach || this.action === A.eat || this.action === A.play ||
-        this.action === A.drink || this.action === A.push || this.action === A.mate || this.action === A.retreat)) {
-      at = ' the ' + (this.focus.cat === 'creature' ? this.focus.name : (CG.KINDS[this.focus.kind] ? CG.KINDS[this.focus.kind].label : this.focus.kind));
+    if (target) {
+      /* A friend has a name; everything else takes an article. */
+      at = ' ' + (target.cat === 'creature'
+        ? target.name
+        : 'the ' + (CG.KINDS[target.kind] ? CG.KINDS[target.kind].label : target.kind));
     }
+    var doing;
+    if (!this.actionOk) doing = 'trying to ' + CG.ACTION_TRY[name];
+    else doing = (target ? CG.ACTION_AT[name] : CG.ACTION_LABEL[name]);
     return this.name + ' is ' + need + ' and ' + doing + at + '.';
   };
 
